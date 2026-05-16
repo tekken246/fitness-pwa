@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root,
+[data-theme='light'] {
+  --color-background: 248 250 252;
+  --color-foreground: 15 23 42;
+  --color-card: 255 255 255;
+  --color-muted: 100 116 139;
+  --color-border: 203 213 225;
+  --color-primary: 15 23 42;
+  --color-accent: 79 70 229;
+  --color-danger: 220 38 38;
+  --color-success: 22 163 74;
+}
+
+[data-theme='dark'] {
+  --color-background: 11 16 32;
+  --color-foreground: 248 250 252;
+  --color-card: 20 27 48;
+  --color-muted: 148 163 184;
+  --color-border: 51 65 85;
+  --color-primary: 248 250 252;
+  --color-accent: 129 140 248;
+  --color-danger: 248 113 113;
+  --color-success: 74 222 128;
+}
+
+[data-theme='rose'] {
+  --color-background: 50 19 39;
+  --color-foreground: 255 247 252;
+  --color-card: 72 32 62;
+  --color-muted: 234 179 217;
+  --color-border: 143 83 124;
+  --color-primary: 255 228 240;
+  --color-accent: 216 180 254;
+  --color-danger: 253 164 175;
+  --color-success: 134 239 172;
+}
+
+html {
+  color-scheme: light dark;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at top left, rgb(var(--color-accent) / 0.22), transparent 34rem),
+    radial-gradient(circle at bottom right, rgb(var(--color-primary) / 0.12), transparent 28rem),
+    rgb(var(--color-background));
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: rgb(var(--color-primary) / 0.22);
+}
