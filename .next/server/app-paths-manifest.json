@@ -1,9 +1,9 @@
 {
   "/manifest.webmanifest/route": "app/manifest.webmanifest/route.js",
-  "/page": "app/page.js",
   "/(app)/today/page": "app/(app)/today/page.js",
   "/(app)/workouts/page": "app/(app)/workouts/page.js",
-  "/(app)/progress/page": "app/(app)/progress/page.js",
   "/(app)/history/page": "app/(app)/history/page.js",
-  "/(app)/sessions/[sessionId]/page": "app/(app)/sessions/[sessionId]/page.js"
+  "/(app)/sessions/[sessionId]/page": "app/(app)/sessions/[sessionId]/page.js",
+  "/(app)/workouts/[dayId]/page": "app/(app)/workouts/[dayId]/page.js",
+  "/(app)/history/[exerciseId]/page": "app/(app)/history/[exerciseId]/page.js"
 }

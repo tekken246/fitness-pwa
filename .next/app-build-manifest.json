@@ -45,6 +45,16 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(app)/sessions/[sessionId]/page.js"
+    ],
+    "/(app)/workouts/[dayId]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(app)/workouts/[dayId]/page.js"
+    ],
+    "/(app)/history/[exerciseId]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(app)/history/[exerciseId]/page.js"
     ]
   }
 }
