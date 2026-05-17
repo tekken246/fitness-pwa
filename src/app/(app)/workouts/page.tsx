@@ -3,76 +3,36 @@ import type { ReactNode } from 'react';
 import { Card } from '@/components/ui/card';
 import { startWorkoutForDayAction } from '@/lib/actions/workout-actions';
 import { getWeeklyPlan } from '@/lib/data/workout-templates';
-import { createFlexibleRoutineAction } from '@/lib/actions/routine-actions';
 
 /** Renders the routines and weekly schedule. */
 export default async function WorkoutsPage(): Promise<ReactNode> {
   const plan = await getWeeklyPlan();
 
-  // Safely separate legacy scheduled days from new floating routines
+  // Safely isolate legacy scheduled days
   const scheduledDays = plan.filter((day) => day.dayOfWeek !== null);
-  const floatingRoutines = plan.filter((day) => day.dayOfWeek === null);
 
   return (
     <div className="space-y-8">
-      {/* NEW: Flexible Routine Builder Interface */}
-      <section className="space-y-4">
-        <Card>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.28em] text-muted">My Library</p>
-              <h1 className="mt-2 text-3xl font-black tracking-tight">Routines</h1>
-            </div>
-          </div>
-        </Card>
+      {/* NOTE: The Flexible Routine Builder (My Library) has been temporarily hidden.
+        It can be restored here later. 
+      */}
 
-        {/* Create Routine Form */}
-        <Card className="mb-4 border-dashed bg-muted/20">
-          <form action={createFlexibleRoutineAction} className="flex flex-col gap-3">
-            <input 
-              name="name" 
-              type="text" 
-              placeholder="Routine Name (e.g., Push Day A)" 
-              className="w-full rounded-md border p-2 text-sm bg-background" 
-              required
-            />
-            <input 
-              name="muscleGroup" 
-              type="text" 
-              placeholder="Target Muscles (e.g., Chest, Shoulders, Triceps)" 
-              className="w-full rounded-md border p-2 text-sm bg-background" 
-              required
-            />
-            <button 
-              type="submit" 
-              className="h-10 w-full rounded-xl bg-primary text-xs font-black uppercase tracking-[0.18em] text-background"
-            >
-              + Create New Routine
-            </button>
-          </form>
-        </Card>
-        
-        {floatingRoutines.length === 0 ? (
-          <p className="px-2 text-sm text-muted">No custom routines yet. Create a flexible routine to start here.</p>
-        ) : (
-          floatingRoutines.map((routine) => <WorkoutCard key={routine.id} day={routine} label="Start Routine" />)
-        )}
-      </section>
-
-      {/* EXISTING: Seed Schedule (Maintains backward compatibility) */}
-      {scheduledDays.length > 0 && (
+      {/* EXISTING: Seed Schedule */}
+      {scheduledDays.length > 0 ? (
         <section className="space-y-4">
            <h2 className="px-2 text-sm font-bold uppercase tracking-[0.28em] text-muted">Weekly Schedule</h2>
           {scheduledDays.map((day) => (
             <WorkoutCard key={day.id} day={day} label="Start this day" />
           ))}
         </section>
+      ) : (
+        <p className="px-2 text-sm text-muted">No scheduled workouts found.</p>
       )}
     </div>
   );
 }
 
-/** Reusable Card Component to prevent code duplication */
+/** Reusable Card Component */
 function WorkoutCard({ day, label }: { day: any; label: string }) {
   return (
     <Card className="space-y-3">
@@ -86,13 +46,13 @@ function WorkoutCard({ day, label }: { day: any; label: string }) {
         </Link>
       </div>
 
-      {day.exercises.length > 0 ? (
+      {day.exercises && day.exercises.length > 0 ? (
         <p className="text-sm text-muted">{day.exercises.join(' · ')}</p>
       ) : (
         <p className="text-sm text-muted">No required exercises.</p>
       )}
 
-      {day.exercises.length > 0 || day.isOptional ? (
+      {(day.exercises && day.exercises.length > 0) || day.isOptional ? (
         <form action={startWorkoutForDayAction}>
           <input name="dayId" type="hidden" value={day.id} />
           <button className="h-11 w-full rounded-2xl bg-primary text-xs font-black uppercase tracking-[0.18em] text-background" type="submit">
