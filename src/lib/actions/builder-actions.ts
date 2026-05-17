@@ -4,10 +4,10 @@ import { eq, max } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/db/client';
 import { exercises, templateExerciseAssignments } from '@/db/schema';
-import { requireUser } from '@/lib/auth';
+import { requireClerkUserId } from '@/lib/auth';
 
 export async function addExerciseToRoutineAction(formData: FormData) {
-  await requireUser(); // Ensure authentication
+  await requireClerkUserId(); // Ensure authentication
   
   const dayId = formData.get('dayId') as string;
   const exerciseId = formData.get('exerciseId') as string;
@@ -44,7 +44,7 @@ export async function addExerciseToRoutineAction(formData: FormData) {
 }
 
 export async function removeExerciseFromRoutineAction(formData: FormData) {
-  await requireUser();
+  await requireClerkUserId();
   const assignmentId = formData.get('assignmentId') as string;
   const dayId = formData.get('dayId') as string;
 

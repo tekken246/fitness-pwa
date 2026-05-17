@@ -5,10 +5,10 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { db } from '@/db/client';
 import { workoutTemplateDays, workoutTemplates } from '@/db/schema';
-import { requireUser } from '@/lib/auth';
+import { requireClerkUserId } from '@/lib/auth';
 
 export async function createFlexibleRoutineAction(formData: FormData) {
-  const user = await requireUser();
+  const user = await requireClerkUserId();
   const name = formData.get('name') as string;
   const muscleGroup = formData.get('muscleGroup') as string;
 
