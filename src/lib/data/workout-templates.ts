@@ -41,7 +41,7 @@ export async function getWeeklyPlan(): Promise<WorkoutDaySummary[]> {
         muscleGroup: row.muscleGroup,
         isRestDay: row.isRestDay,
         isOptional: row.isOptional,
-        exercises: [],
+        exercises: [] as string[],
       };
 
     if (row.exerciseName) {
