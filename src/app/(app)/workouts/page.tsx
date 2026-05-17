@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Card } from '@/components/ui/card';
 import { startWorkoutForDayAction } from '@/lib/actions/workout-actions';
 import { getWeeklyPlan } from '@/lib/data/workout-templates';
+import { createFlexibleRoutineAction } from '@/lib/actions/routine-actions';
 
 /** Renders the routines and weekly schedule. */
 export default async function WorkoutsPage(): Promise<ReactNode> {
@@ -23,6 +24,32 @@ export default async function WorkoutsPage(): Promise<ReactNode> {
               <h1 className="mt-2 text-3xl font-black tracking-tight">Routines</h1>
             </div>
           </div>
+        </Card>
+
+        {/* Create Routine Form */}
+        <Card className="mb-4 border-dashed bg-muted/20">
+          <form action={createFlexibleRoutineAction} className="flex flex-col gap-3">
+            <input 
+              name="name" 
+              type="text" 
+              placeholder="Routine Name (e.g., Push Day A)" 
+              className="w-full rounded-md border p-2 text-sm bg-background" 
+              required
+            />
+            <input 
+              name="muscleGroup" 
+              type="text" 
+              placeholder="Target Muscles (e.g., Chest, Shoulders, Triceps)" 
+              className="w-full rounded-md border p-2 text-sm bg-background" 
+              required
+            />
+            <button 
+              type="submit" 
+              className="h-10 w-full rounded-xl bg-primary text-xs font-black uppercase tracking-[0.18em] text-background"
+            >
+              + Create New Routine
+            </button>
+          </form>
         </Card>
         
         {floatingRoutines.length === 0 ? (
