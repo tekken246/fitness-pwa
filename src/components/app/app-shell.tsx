@@ -15,7 +15,7 @@ export function AppShell({ children }: AppShellProps): ReactNode {
         <div className="mx-auto flex max-w-md items-center justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-muted">Fit Track</p>
-            <h1 className="text-lg font-black tracking-tight">Workout PWA</h1>
+            {/* <h1 className="text-lg font-black tracking-tight">Workout PWA</h1> */}
           </div>
           <UserButton afterSignOutUrl="/" />
         </div>
