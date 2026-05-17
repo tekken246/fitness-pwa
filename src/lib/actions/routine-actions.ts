@@ -8,7 +8,7 @@ import { workoutTemplateDays, workoutTemplates } from '@/db/schema';
 import { requireClerkUserId } from '@/lib/auth';
 
 export async function createFlexibleRoutineAction(formData: FormData) {
-  const user = await requireClerkUserId();
+  await requireClerkUserId(); 
   const name = formData.get('name') as string;
   const muscleGroup = formData.get('muscleGroup') as string;
 
@@ -24,8 +24,8 @@ export async function createFlexibleRoutineAction(formData: FormData) {
     id: templateId,
     name: name,
     version: 1,
-    source: 'custom',
-    isSeed: false,
+    source: 'custom', 
+    // FIXED: Removed the non-existent 'isSeed' property
   });
 
   // 2. Create the floating routine (dayOfWeek is omitted/null)
@@ -41,5 +41,5 @@ export async function createFlexibleRoutineAction(formData: FormData) {
   });
 
   revalidatePath('/workouts');
-  redirect(`/workouts/${dayId}/edit`); // Redirects to a builder page
+  redirect(`/workouts/${dayId}/edit`);
 }

@@ -12,7 +12,7 @@ export type UserSettings = {
 
 export type WorkoutDaySummary = {
   id: string;
-  dayOfWeek: number;
+  dayOfWeek: number | null;
   displayOrder: number;
   name: string;
   muscleGroup: string;
