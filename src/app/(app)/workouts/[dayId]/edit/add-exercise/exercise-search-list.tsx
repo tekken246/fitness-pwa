@@ -79,22 +79,22 @@ export function ExerciseSearchList({ exercises, dayId }: { exercises: Exercise[]
         {filteredExercises.length === 0 ? (
           <p className="text-center text-sm text-muted mt-8">No exercises match "{query}".</p>
         ) : (
-          filteredExercises.map((exercise) => (
+            filteredExercises.map((exercise) => (
             <Card key={exercise.id} className="flex items-center justify-between p-3 hover:border-primary/50 transition-colors">
-              <div>
+                <Link href={`/exercises/${exercise.id}`} className="flex-1 pr-4">
                 <h3 className="font-bold text-sm">{exercise.name}</h3>
                 <p className="text-xs text-muted capitalize">
-                  {exercise.primaryMuscles.join(', ') || 'Various'} • {exercise.equipment.replace('_', ' ')}
+                    {exercise.primaryMuscles.join(', ') || 'Various'} • {exercise.equipment.replace('_', ' ')}
                 </p>
-              </div>
-              
-              <button
+                </Link>
+                
+                <button
                 onClick={() => handleAdd(exercise.id)}
                 disabled={isPending}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50 transition-colors"
-              >
+                className="shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50 transition-colors"
+                >
                 <Plus className="h-4 w-4" />
-              </button>
+                </button>
             </Card>
           ))
         )}
