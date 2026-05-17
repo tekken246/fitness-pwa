@@ -10,6 +10,12 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
+export const routineFolders = pgTable('routine_folders', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const userSettings = pgTable('user_settings', {
   clerkUserId: text('clerk_user_id').primaryKey(),
   unit: text('unit').notNull().default('lb'),
@@ -41,7 +47,8 @@ export const workoutTemplateDays = pgTable(
     templateId: text('template_id')
       .notNull()
       .references(() => workoutTemplates.id, { onDelete: 'cascade' }),
-    dayOfWeek: integer('day_of_week').notNull(),
+    folderId: text('folder_id').references(() => routineFolders.id, { onDelete: 'set null' }), // New: Organize floating routines
+    dayOfWeek: integer('day_of_week'), // REMOVED .notNull() to allow floating routines
     displayOrder: integer('display_order').notNull(),
     slug: text('slug').notNull(),
     name: text('name').notNull(),
@@ -51,6 +58,7 @@ export const workoutTemplateDays = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
+    // Unique index on nullable columns allows multiple nulls in Postgres, preserving backward compatibility.
     templateDay: uniqueIndex('uq_workout_template_days_template_day').on(table.templateId, table.dayOfWeek),
     templateSlug: uniqueIndex('uq_workout_template_days_template_slug').on(table.templateId, table.slug),
   }),
@@ -62,6 +70,12 @@ export const exercises = pgTable('exercises', {
   category: text('category').notNull(),
   measurementType: text('measurement_type').notNull(),
   defaultUnit: text('default_unit').notNull().default('lb'),
+  // --- NEW COLUMNS (Defaults prevent breaking existing rows) ---
+  images: text('images').array().notNull().default([]),
+  instructions: text('instructions').array().notNull().default([]),
+  primaryMuscles: text('primary_muscles').array().notNull().default([]),
+  equipment: text('equipment').notNull().default('other'),
+  // -------------------------------------------------------------
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
