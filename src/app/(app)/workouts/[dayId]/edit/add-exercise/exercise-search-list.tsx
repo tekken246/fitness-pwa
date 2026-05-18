@@ -7,14 +7,15 @@ import { Search, Plus } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { addExerciseToRoutineAction } from '@/lib/actions/builder-actions';
 
+// 1. Added category to the type so we can read the seed data
 type Exercise = {
   id: string;
   name: string;
+  category: string; 
   primaryMuscles: string[];
   equipment: string;
 };
 
-// Define the core filter categories
 const MUSCLE_FILTERS = ['All', 'Chest', 'Back', 'Shoulders', 'Legs', 'Arms', 'Core'];
 
 export function ExerciseSearchList({ exercises, dayId }: { exercises: Exercise[]; dayId: string }) {
@@ -23,27 +24,32 @@ export function ExerciseSearchList({ exercises, dayId }: { exercises: Exercise[]
   const [isPending, setIsPending] = useState(false);
   const router = useRouter();
 
-  // Instant client-side filtering combining both Search Text and Filter Bubbles
   const filteredExercises = useMemo(() => {
     return exercises.filter((ex) => {
-      // 1. Text Match
+      // Helper: Check if a muscle matches the old 'category' OR the new 'primaryMuscles' array
+      const checkMuscle = (target: string) => 
+        (ex.category && ex.category.toLowerCase() === target) || 
+        (ex.primaryMuscles && ex.primaryMuscles.some(m => m.toLowerCase() === target));
+
+      // Search Text Match
       const lowerQuery = query.toLowerCase();
       const matchesQuery = !query.trim() || 
         ex.name.toLowerCase().includes(lowerQuery) ||
-        ex.primaryMuscles.some(m => m.toLowerCase().includes(lowerQuery)) ||
-        ex.equipment.toLowerCase().includes(lowerQuery);
+        (ex.category && ex.category.toLowerCase().includes(lowerQuery)) ||
+        (ex.primaryMuscles && ex.primaryMuscles.some(m => m.toLowerCase().includes(lowerQuery))) ||
+        (ex.equipment && ex.equipment.toLowerCase().includes(lowerQuery));
 
-      // 2. Bubble Match
+      // Bubble Filter Match
       let matchesFilter = true;
       if (activeFilter !== 'All') {
         const target = activeFilter.toLowerCase();
-        // Map UI labels to database muscle groups
+        
         if (target === 'arms') {
-          matchesFilter = ex.primaryMuscles.some(m => m === 'biceps' || m === 'triceps');
+          matchesFilter = checkMuscle('biceps') || checkMuscle('triceps');
         } else if (target === 'core') {
-          matchesFilter = ex.primaryMuscles.some(m => m === 'abs' || m === 'core');
+          matchesFilter = checkMuscle('abs') || checkMuscle('core');
         } else {
-          matchesFilter = ex.primaryMuscles.some(m => m === target);
+          matchesFilter = checkMuscle(target);
         }
       }
 
@@ -100,7 +106,8 @@ export function ExerciseSearchList({ exercises, dayId }: { exercises: Exercise[]
             onClick={() => setActiveFilter(filter)}
             className={`snap-start shrink-0 rounded-full px-4 py-1.5 text-xs font-bold transition-all border ${
               activeFilter === filter
-                ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                // 2. FIXED CONTRAST: Switched to text-background so text is dark against the bright primary color
+                ? 'bg-primary text-background border-primary shadow-sm' 
                 : 'bg-muted/30 text-muted-foreground border-border/50 hover:bg-muted/80'
             }`}
           >
@@ -112,14 +119,15 @@ export function ExerciseSearchList({ exercises, dayId }: { exercises: Exercise[]
       {/* Filtered List */}
       <div className="flex-1 overflow-y-auto space-y-2 pr-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {filteredExercises.length === 0 ? (
-          <p className="text-center text-sm text-muted mt-8">No exercises match your search.</p>
+          <p className="text-center text-sm text-muted mt-8">No exercises match your filters.</p>
         ) : (
             filteredExercises.map((exercise) => (
             <Card key={exercise.id} className="flex items-center justify-between p-3 hover:border-primary/50 transition-colors">
                 <Link href={`/exercises/${exercise.id}`} className="flex-1 pr-4">
                 <h3 className="font-bold text-sm">{exercise.name}</h3>
                 <p className="text-xs text-muted capitalize">
-                    {exercise.primaryMuscles.join(', ') || 'Various'} • {exercise.equipment.replace('_', ' ')}
+                    {/* Graceful fallback if muscles array is empty */}
+                    {(exercise.primaryMuscles && exercise.primaryMuscles.length > 0) ? exercise.primaryMuscles.join(', ') : exercise.category} • {exercise.equipment ? exercise.equipment.replace('_', ' ') : 'Various'}
                 </p>
                 </Link>
                 
