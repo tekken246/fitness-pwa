@@ -1,22 +1,24 @@
+'use client';
+
 import { eq, asc } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Trash2, GripVertical, Plus, CheckCircle2, Dumbbell } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { use } from 'react';
 
 import { db } from '@/db/client';
 import { workoutTemplateDays, templateExerciseAssignments, exercises } from '@/db/schema';
 import { Card } from '@/components/ui/card';
 import { removeExerciseFromRoutineAction } from '@/lib/actions/builder-actions';
+import { deleteFlexibleRoutineAction } from '@/lib/actions/routine-actions';
 
 interface PageProps {
   params: Promise<{ dayId: string }>;
 }
 
-export default async function RoutineEditorPage({ params }: PageProps): Promise<ReactNode> {
+export default async function RoutineEditorPage({ params }: PageProps) {
   const { dayId } = await params;
 
-  // 1. Fetch routine details
   const [routine] = await db
     .select()
     .from(workoutTemplateDays)
@@ -24,14 +26,13 @@ export default async function RoutineEditorPage({ params }: PageProps): Promise<
 
   if (!routine) notFound();
 
-  // 2. Fetch assignments WITH images from the exercises table
   const assignments = await db
     .select({
       id: templateExerciseAssignments.id,
       displayName: templateExerciseAssignments.displayName,
       sets: templateExerciseAssignments.sets,
       targetReps: templateExerciseAssignments.targetReps,
-      images: exercises.images, // Pulling the image array!
+      images: exercises.images, 
     })
     .from(templateExerciseAssignments)
     .innerJoin(exercises, eq(exercises.id, templateExerciseAssignments.exerciseId))
@@ -40,33 +41,63 @@ export default async function RoutineEditorPage({ params }: PageProps): Promise<
 
   return (
     <div className="space-y-6 pb-24">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/workouts" className="rounded-full bg-muted p-2 text-foreground hover:bg-muted/80 transition-colors">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-black tracking-tight">{routine.name}</h1>
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-primary">{routine.muscleGroup}</p>
+      {/* Header with Top-Right Delete Button */}
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-4">
+          <Link href="/workouts" className="rounded-full bg-muted p-2 text-foreground hover:bg-muted/80 transition-colors">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <div>
+            <h1 className="text-2xl font-black tracking-tight">{routine.name}</h1>
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-primary">{routine.muscleGroup}</p>
+          </div>
         </div>
+
+        {/* Delete Routine Form */}
+        <form action={deleteFlexibleRoutineAction}>
+          <input type="hidden" name="dayId" value={routine.id} />
+          <input type="hidden" name="templateId" value={routine.templateId || ''} />
+          <button 
+            type="submit" 
+            className="rounded-full bg-destructive/10 p-2 text-destructive hover:bg-destructive/20 transition-colors"
+          >
+            <Trash2 className="h-5 w-5" />
+          </button>
+        </form>
       </div>
 
-      {/* Exercise List */}
+      {/* Exercise List & Guided Empty State */}
       <div className="space-y-3">
         {assignments.length === 0 ? (
-          <Card className="flex flex-col items-center justify-center py-16 text-center border-dashed bg-muted/10 shadow-none">
-            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-              <Plus className="h-6 w-6 text-primary" />
+          <Card className="flex flex-col p-6 border-dashed border-2 border-primary/20 bg-primary/5 shadow-none space-y-6">
+            <div className="text-center">
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                <Dumbbell className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="font-black text-lg text-foreground">Build Your Routine</h3>
+              <p className="text-xs text-muted-foreground mt-1">Follow these steps to set up your workout.</p>
             </div>
-            <p className="text-sm font-bold text-foreground">Your routine is empty</p>
-            <p className="text-xs text-muted-foreground mt-1">Add some exercises below to get started.</p>
+
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-background border border-primary/30 text-xs font-bold text-primary">1</span>
+                <p className="text-sm text-foreground pt-0.5">Tap <strong className="text-primary">Add Exercise</strong> below to browse the library.</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-background border border-primary/30 text-xs font-bold text-primary">2</span>
+                <p className="text-sm text-foreground pt-0.5">Select the exercises you want to perform.</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-background border border-primary/30 text-xs font-bold text-primary">3</span>
+                <p className="text-sm text-foreground pt-0.5">Click <strong className="text-primary">Done & Save Routine</strong> when finished.</p>
+              </div>
+            </div>
           </Card>
         ) : (
           assignments.map((assignment) => (
             <Card key={assignment.id} className="flex items-center gap-3 p-3 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
               <GripVertical className="h-5 w-5 shrink-0 text-muted/30 cursor-grab active:cursor-grabbing" />
               
-              {/* Thumbnail Image */}
               {assignment.images && assignment.images[0] ? (
                 <div className="h-14 w-14 shrink-0 rounded-lg bg-white p-1 border">
                   <img 
@@ -88,7 +119,6 @@ export default async function RoutineEditorPage({ params }: PageProps): Promise<
                 </p>
               </div>
 
-              {/* Remove Exercise Button */}
               <form action={removeExerciseFromRoutineAction}>
                 <input type="hidden" name="assignmentId" value={assignment.id} />
                 <input type="hidden" name="dayId" value={dayId} />
@@ -101,7 +131,6 @@ export default async function RoutineEditorPage({ params }: PageProps): Promise<
         )}
       </div>
 
-      {/* Action Buttons (Add & Save) */}
       <div className="space-y-3 pt-4">
         <Link 
           href={`/workouts/${dayId}/edit/add-exercise`}
@@ -111,7 +140,6 @@ export default async function RoutineEditorPage({ params }: PageProps): Promise<
           Add Exercise
         </Link>
 
-        {/* Psychological "Save" Button - Since data auto-saves, this just routes home */}
         <Link 
           href="/workouts"
           className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-foreground text-sm font-black uppercase tracking-[0.18em] text-background hover:bg-primary transition-colors"

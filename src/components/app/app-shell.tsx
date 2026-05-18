@@ -11,11 +11,10 @@ type AppShellProps = {
 export function AppShell({ children }: AppShellProps): ReactNode {
   return (
     <div className="min-h-dvh bg-background text-foreground">
-      <header className="sticky top-0 z-30 border-b border-border bg-background/80 px-4 py-3 backdrop-blur-xl">
+      <header className="sticky top-0 z-30 border-b border-border bg-background/80 px-4 pb-3 pt-[max(env(safe-area-inset-top),0.75rem)] backdrop-blur-xl">
         <div className="mx-auto flex max-w-md items-center justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-muted">Fit Track</p>
-            {/* <h1 className="text-lg font-black tracking-tight">Workout PWA</h1> */}
           </div>
           <UserButton afterSignOutUrl="/" />
         </div>
