@@ -4,7 +4,8 @@ import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { db } from '@/db/client';
-import { workoutTemplateDays, workoutTemplates, templateExerciseAssignments } from '@/db/schema';
+// 1. Added workoutSessions to the import
+import { workoutTemplateDays, workoutTemplates, templateExerciseAssignments, workoutSessions } from '@/db/schema'; 
 import { requireClerkUserId } from '@/lib/auth';
 
 export async function createFlexibleRoutineAction(formData: FormData) {
@@ -42,7 +43,6 @@ export async function createFlexibleRoutineAction(formData: FormData) {
   redirect(`/workouts/${dayId}/edit`);
 }
 
-// NEW: Delete Routine Action
 export async function deleteFlexibleRoutineAction(formData: FormData) {
   await requireClerkUserId();
   const dayId = formData.get('dayId') as string;
@@ -50,7 +50,11 @@ export async function deleteFlexibleRoutineAction(formData: FormData) {
 
   if (!dayId || !templateId) throw new Error('Missing routine IDs');
 
-  // Delete in order to avoid foreign key database crashes
+  // 1. Delete associated workout sessions first to remove foreign key locks.
+  // Because the schema uses onDelete: 'cascade' for entries and sets, this single line cleans up the whole history.
+  await db.delete(workoutSessions).where(eq(workoutSessions.templateDayId, dayId));
+
+  // 2. Safely delete the routine data now that the locks are removed.
   await db.delete(templateExerciseAssignments).where(eq(templateExerciseAssignments.dayId, dayId));
   await db.delete(workoutTemplateDays).where(eq(workoutTemplateDays.id, dayId));
   await db.delete(workoutTemplates).where(eq(workoutTemplates.id, templateId));
