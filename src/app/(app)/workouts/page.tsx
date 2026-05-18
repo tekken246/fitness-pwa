@@ -1,11 +1,11 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { Plus, Dumbbell, CalendarDays } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { startWorkoutForDayAction } from '@/lib/actions/workout-actions';
 import { getWeeklyPlan } from '@/lib/data/workout-templates';
 import { createFlexibleRoutineAction } from '@/lib/actions/routine-actions';
 
-/** Renders the routines and weekly schedule. */
 export default async function WorkoutsPage(): Promise<ReactNode> {
   const plan = await getWeeklyPlan();
 
@@ -15,93 +15,110 @@ export default async function WorkoutsPage(): Promise<ReactNode> {
 
   return (
     <div className="space-y-8 pb-12">
-      {/* NEW: Flexible Routine Builder Interface */}
+      {/* My Library Section */}
       <section className="space-y-4">
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.28em] text-muted">My Library</p>
-              <h1 className="mt-2 text-3xl font-black tracking-tight">Routines</h1>
-            </div>
+        <div className="flex items-end justify-between px-2">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.28em] text-muted flex items-center gap-2">
+              <Dumbbell className="h-4 w-4" /> My Library
+            </p>
+            <h1 className="text-3xl font-black tracking-tight mt-1">Routines</h1>
           </div>
-        </Card>
+        </div>
 
         {/* Create Routine Form */}
-        <Card className="mb-4 border-dashed bg-muted/20 p-4">
+        <Card className="border-dashed bg-muted/10 p-4 shadow-none">
           <form action={createFlexibleRoutineAction} className="flex flex-col gap-3">
-            <input 
-              name="name" 
-              type="text" 
-              placeholder="Routine Name (e.g., Push Day A)" 
-              className="w-full rounded-md border p-2 text-sm bg-background" 
-              required
-            />
-            <input 
-              name="muscleGroup" 
-              type="text" 
-              placeholder="Target Muscles (e.g., Chest, Shoulders)" 
-              className="w-full rounded-md border p-2 text-sm bg-background" 
-              required
-            />
+            <div className="flex gap-3">
+              <input 
+                name="name" 
+                type="text" 
+                placeholder="Routine Name (e.g., Push Day)" 
+                className="w-full rounded-xl border-none bg-muted/50 p-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/50" 
+                required
+              />
+              <input 
+                name="muscleGroup" 
+                type="text" 
+                placeholder="Muscles" 
+                className="w-1/3 rounded-xl border-none bg-muted/50 p-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/50" 
+                required
+              />
+            </div>
             <button 
               type="submit" 
-              className="h-10 w-full rounded-xl bg-primary text-xs font-black uppercase tracking-[0.18em] text-primary-foreground hover:opacity-90 transition-opacity"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary text-xs font-black uppercase tracking-[0.18em] text-primary-foreground hover:opacity-90 transition-opacity"
             >
-              + Create New Routine
+              <Plus className="h-4 w-4" /> Create Routine
             </button>
           </form>
         </Card>
         
-        {floatingRoutines.length === 0 ? (
-          <p className="px-2 text-sm text-muted">No custom routines yet. Create a flexible routine to start here.</p>
-        ) : (
-          floatingRoutines.map((routine) => <WorkoutCard key={routine.id} day={routine} label="Start Routine" isCustom />)
-        )}
+        {/* Custom Routines Grid */}
+        <div className="grid gap-4 md:grid-cols-2">
+          {floatingRoutines.length === 0 ? (
+            <div className="col-span-full py-8 text-center text-sm text-muted">
+              No custom routines yet. Build your first one above.
+            </div>
+          ) : (
+            floatingRoutines.map((routine) => <WorkoutCard key={routine.id} day={routine} label="Start Routine" isCustom />)
+          )}
+        </div>
       </section>
 
-      {/* EXISTING: Legacy Seed Schedule */}
+      <hr className="border-border/50" />
+
+      {/* Legacy Weekly Schedule */}
       {scheduledDays.length > 0 && (
         <section className="space-y-4">
-           <h2 className="px-2 text-sm font-bold uppercase tracking-[0.28em] text-muted">Weekly Schedule</h2>
-          {scheduledDays.map((day) => (
-            <WorkoutCard key={day.id} day={day} label="Start this day" isCustom={false} />
-          ))}
+          <h2 className="px-2 text-xs font-bold uppercase tracking-[0.28em] text-muted flex items-center gap-2">
+            <CalendarDays className="h-4 w-4" /> Weekly Schedule
+          </h2>
+          <div className="grid gap-4 md:grid-cols-2">
+            {scheduledDays.map((day) => (
+              <WorkoutCard key={day.id} day={day} label="Start" isCustom={false} />
+            ))}
+          </div>
         </section>
       )}
     </div>
   );
 }
 
-/** Reusable Card Component */
 function WorkoutCard({ day, label, isCustom }: { day: any; label: string; isCustom: boolean }) {
-  // Custom routines go to the editor, scheduled days go to legacy details
   const detailLink = isCustom ? `/workouts/${day.id}/edit` : `/workouts/${day.id}`;
 
   return (
-    <Card className="space-y-3 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-muted">{day.name}</p>
-          <h2 className="text-xl font-black tracking-tight">{day.muscleGroup}</h2>
+    <Card className="group flex flex-col justify-between overflow-hidden border-border/50 hover:border-primary/30 transition-colors">
+      <div className="p-5 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-primary">{day.name}</p>
+            <h2 className="text-xl font-black tracking-tight mt-1">{day.muscleGroup}</h2>
+          </div>
+          <Link className="shrink-0 rounded-full bg-muted/50 px-3 py-1.5 text-xs font-bold text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors" href={detailLink}>
+            {isCustom ? 'Edit' : 'View'}
+          </Link>
         </div>
-        <Link className="rounded-full border border-border px-3 py-1 text-xs font-bold text-muted hover:bg-muted/50 transition-colors" href={detailLink}>
-          {isCustom ? 'Edit' : 'Details'}
-        </Link>
+
+        {day.exercises && day.exercises.length > 0 ? (
+          <p className="text-sm font-medium text-muted-foreground leading-relaxed line-clamp-2">
+            {day.exercises.join(' • ')}
+          </p>
+        ) : (
+          <p className="text-sm italic text-muted-foreground/60">No exercises added yet.</p>
+        )}
       </div>
 
-      {day.exercises && day.exercises.length > 0 ? (
-        <p className="text-sm text-muted">{day.exercises.join(' · ')}</p>
-      ) : (
-        <p className="text-sm text-muted italic">No exercises added yet.</p>
-      )}
-
       {(day.exercises && day.exercises.length > 0) || day.isOptional ? (
-        <form action={startWorkoutForDayAction}>
-          <input name="dayId" type="hidden" value={day.id} />
-          <button className="mt-2 h-11 w-full rounded-2xl bg-primary text-xs font-black uppercase tracking-[0.18em] text-primary-foreground hover:opacity-90 transition-opacity" type="submit">
-            {label}
-          </button>
-        </form>
+        <div className="bg-muted/10 p-3 border-t border-border/50">
+          <form action={startWorkoutForDayAction}>
+            <input name="dayId" type="hidden" value={day.id} />
+            <button className="h-10 w-full rounded-xl bg-foreground text-xs font-black uppercase tracking-[0.18em] text-background hover:bg-primary transition-colors" type="submit">
+              {label}
+            </button>
+          </form>
+        </div>
       ) : null}
     </Card>
   );

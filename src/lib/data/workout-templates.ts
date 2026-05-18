@@ -24,7 +24,7 @@ export async function getWeeklyPlan(): Promise<WorkoutDaySummary[]> {
     })
     .from(workoutTemplateDays)
     .leftJoin(templateExerciseAssignments, eq(templateExerciseAssignments.dayId, workoutTemplateDays.id))
-    .where(eq(workoutTemplateDays.templateId, SEED_TEMPLATE_ID))
+    // .where(eq(workoutTemplateDays.templateId, SEED_TEMPLATE_ID))
     .orderBy(asc(workoutTemplateDays.displayOrder), asc(templateExerciseAssignments.position));
 
   const dayMap = new Map<string, WorkoutDaySummary>();
