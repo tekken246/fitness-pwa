@@ -2,100 +2,95 @@
 
 import { useState, useTransition } from 'react';
 import type { ReactNode } from 'react';
+import { Check, Loader2 } from 'lucide-react';
 
 import { updateSettingsAction } from '@/lib/actions/settings-actions';
-import type { ThemePreference, UnitPreference, UserSettings } from '@/lib/types';
-import { cn } from '@/lib/utils';
+import type { UserSettings } from '@/lib/types';
 
 type ThemeSelectorProps = {
   settings: UserSettings;
 };
 
-const themeOptions: { value: ThemePreference; label: string; description: string }[] = [
-  { value: 'light', label: 'Light', description: 'Clean white training interface.' },
-  { value: 'dark', label: 'Dark', description: 'High-contrast black training interface.' },
-  { value: 'rose', label: 'Rose Glow', description: 'Rose, lavender, gradient, glass styling.' },
-];
-
-/** Renders settings controls for theme, unit preference, and timezone. */
 export function ThemeSelector({ settings }: ThemeSelectorProps): ReactNode {
-  const [theme, setTheme] = useState(settings.theme);
-  const [unit, setUnit] = useState(settings.unit);
-  const [timezone, setTimezone] = useState(settings.timezone);
-  const [message, setMessage] = useState<string | null>(null);
+  const [currentTheme, setCurrentTheme] = useState(settings.theme);
+  const [currentUnit, setCurrentUnit] = useState(settings.unit);
   const [isPending, startTransition] = useTransition();
 
-  const save = (): void => {
+  // Unified instant-save mechanism
+  const triggerUpdate = (updatedTheme: typeof settings.theme, updatedUnit: typeof settings.unit) => {
     startTransition(() => {
-      updateSettingsAction({ theme, unit, timezone }).then((result) => {
-        if (!result.ok) {
-          setMessage(result.error);
-          return;
+      updateSettingsAction({ 
+        theme: updatedTheme, 
+        unit: updatedUnit, 
+        timezone: settings.timezone 
+      }).then((result) => {
+        if (result.ok) {
+          document.documentElement.dataset.theme = updatedTheme;
+          window.localStorage.setItem('fit_theme', updatedTheme);
         }
-
-        document.documentElement.dataset.theme = theme;
-        window.localStorage.setItem('fit_theme', theme);
-        setMessage('Settings saved.');
       });
     });
   };
 
+  const handleThemeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newTheme = e.target.value as typeof settings.theme;
+    setCurrentTheme(newTheme);
+    triggerUpdate(newTheme, currentUnit);
+  };
+
+  const toggleUnit = (newUnit: typeof settings.unit) => {
+    if (newUnit === currentUnit) return;
+    setCurrentUnit(newUnit);
+    triggerUpdate(currentTheme, newUnit);
+  };
+
   return (
-    <section className="space-y-4 rounded-3xl border border-border bg-card/80 p-5 shadow-glow backdrop-blur">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-[0.22em] text-muted">Appearance</p>
-        <h2 className="text-xl font-black tracking-tight">Theme selector</h2>
-      </div>
-
-      <div className="grid gap-3">
-        {themeOptions.map((option) => (
-          <button
-            className={cn(
-              'rounded-2xl border border-border bg-background/45 p-4 text-left focus:outline-none focus:ring-2 focus:ring-primary',
-              theme === option.value && 'border-primary bg-primary/15',
-            )}
-            key={option.value}
-            onClick={() => setTheme(option.value)}
-            type="button"
+    <div className="w-full space-y-4">
+      {/* 1. Integrated Theme Select Dropdown Row */}
+      <div className="flex items-center justify-between p-4">
+        <span className="text-[15px] font-medium text-white">Theme Mode</span>
+        <div className="relative flex items-center">
+          {isPending && <Loader2 className="absolute -left-6 h-4 w-4 animate-spin text-[#22C55E]" />}
+          <select
+            value={currentTheme}
+            onChange={handleThemeChange}
+            className="h-9 rounded-[10px] bg-white/[0.06] border border-white/[0.08] px-3 text-[13px] font-semibold text-white focus:outline-none focus:ring-2 focus:ring-[#22C55E]/40 appearance-none pr-8 relative bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20className%3D%22h-4%20w-4%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2020%2020%20%22%20fill%3D%22rgba%28255,255,255,0.4%29%22%3E%3Cpath%20fillRule%3D%22evenodd%22%20d%3D%22M5.293%207.293a1%201%200%20011.414%200L10%2010.586l3.293-3.293a1%201%200%20111.414%201.414l-4%204a1%201%200%2001-1.414%200l-4-4a1%201%200%20010-1.414z%22%20clipRule%3D%22evenodd%22%3E%3C/path%3E%3C/svg%3E')] bg-[length:16px_16px] bg-[right_8px_center] bg-no-repeat"
           >
-            <span className="block text-base font-black">{option.label}</span>
-            <span className="mt-1 block text-sm text-muted">{option.description}</span>
-          </button>
-        ))}
+            <option value="dark" className="bg-[#0a0e1a]">Dark</option>
+            <option value="light" className="bg-[#0a0e1a]">Light</option>
+            <option value="rose" className="bg-[#0a0e1a]">Rose Glow</option>
+          </select>
+        </div>
       </div>
 
-      <label className="block space-y-2">
-        <span className="text-xs font-bold uppercase tracking-[0.18em] text-muted">Units</span>
-        <select
-          className="h-12 w-full rounded-2xl border-border bg-background/70 font-bold focus:border-primary focus:ring-primary"
-          onChange={(event) => setUnit(event.currentTarget.value as UnitPreference)}
-          value={unit}
-        >
-          <option value="lb">Pounds</option>
-          <option value="kg">Kilograms</option>
-        </select>
-      </label>
-
-      <label className="block space-y-2">
-        <span className="text-xs font-bold uppercase tracking-[0.18em] text-muted">Timezone</span>
-        <input
-          className="h-12 w-full rounded-2xl border-border bg-background/70 font-bold focus:border-primary focus:ring-primary"
-          onChange={(event) => setTimezone(event.currentTarget.value)}
-          placeholder="America/New_York"
-          value={timezone}
-        />
-      </label>
-
-      {message ? <p className="rounded-2xl bg-background/60 p-3 text-sm font-semibold text-muted">{message}</p> : null}
-
-      <button
-        className="h-12 w-full rounded-2xl bg-primary text-sm font-black uppercase tracking-[0.18em] text-background disabled:opacity-60"
-        disabled={isPending}
-        onClick={save}
-        type="button"
-      >
-        Save settings
-      </button>
-    </section>
+      {/* 2. Integrated Weight Unit Segmented Switch Row */}
+      <div className="flex items-center justify-between p-4 border-t border-white/[0.06]">
+        <span className="text-[15px] font-medium text-white">Weight Unit</span>
+        <div className="flex rounded-[10px] bg-white/[0.04] p-0.5 border border-white/[0.06]">
+          <button
+            type="button"
+            onClick={() => toggleUnit('lb')}
+            className={`px-3 py-1.5 rounded-[8px] text-[13px] font-semibold transition-all ${
+              currentUnit === 'lb' 
+                ? 'bg-white/10 text-white shadow-sm' 
+                : 'text-white/40 hover:text-white/70'
+            }`}
+          >
+            LBS
+          </button>
+          <button
+            type="button"
+            onClick={() => toggleUnit('kg')}
+            className={`px-3 py-1.5 rounded-[8px] text-[13px] font-semibold transition-all ${
+              currentUnit === 'kg' 
+                ? 'bg-white/10 text-white shadow-sm' 
+                : 'text-white/40 hover:text-white/70'
+            }`}
+          >
+            KGS
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
