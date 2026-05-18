@@ -1,4 +1,4 @@
-'use client';
+// 'use client';
 
 import { eq, asc } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
