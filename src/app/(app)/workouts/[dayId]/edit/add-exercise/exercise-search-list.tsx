@@ -14,22 +14,42 @@ type Exercise = {
   equipment: string;
 };
 
+// Define the core filter categories
+const MUSCLE_FILTERS = ['All', 'Chest', 'Back', 'Shoulders', 'Legs', 'Arms', 'Core'];
+
 export function ExerciseSearchList({ exercises, dayId }: { exercises: Exercise[]; dayId: string }) {
   const [query, setQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState('All');
   const [isPending, setIsPending] = useState(false);
   const router = useRouter();
 
-  // Instant client-side filtering for PWA speed
+  // Instant client-side filtering combining both Search Text and Filter Bubbles
   const filteredExercises = useMemo(() => {
-    if (!query.trim()) return exercises;
-    const lowerQuery = query.toLowerCase();
-    
-    return exercises.filter((ex) => 
-      ex.name.toLowerCase().includes(lowerQuery) ||
-      ex.primaryMuscles.some(m => m.toLowerCase().includes(lowerQuery)) ||
-      ex.equipment.toLowerCase().includes(lowerQuery)
-    );
-  }, [query, exercises]);
+    return exercises.filter((ex) => {
+      // 1. Text Match
+      const lowerQuery = query.toLowerCase();
+      const matchesQuery = !query.trim() || 
+        ex.name.toLowerCase().includes(lowerQuery) ||
+        ex.primaryMuscles.some(m => m.toLowerCase().includes(lowerQuery)) ||
+        ex.equipment.toLowerCase().includes(lowerQuery);
+
+      // 2. Bubble Match
+      let matchesFilter = true;
+      if (activeFilter !== 'All') {
+        const target = activeFilter.toLowerCase();
+        // Map UI labels to database muscle groups
+        if (target === 'arms') {
+          matchesFilter = ex.primaryMuscles.some(m => m === 'biceps' || m === 'triceps');
+        } else if (target === 'core') {
+          matchesFilter = ex.primaryMuscles.some(m => m === 'abs' || m === 'core');
+        } else {
+          matchesFilter = ex.primaryMuscles.some(m => m === target);
+        }
+      }
+
+      return matchesQuery && matchesFilter;
+    });
+  }, [query, activeFilter, exercises]);
 
   const handleAdd = async (exerciseId: string) => {
     if (isPending) return;
@@ -40,10 +60,7 @@ export function ExerciseSearchList({ exercises, dayId }: { exercises: Exercise[]
       formData.append('dayId', dayId);
       formData.append('exerciseId', exerciseId);
       
-      // Call the Server Action
       await addExerciseToRoutineAction(formData);
-      
-      // Navigate back to the builder automatically
       router.push(`/workouts/${dayId}/edit`);
     } catch (error) {
       console.error("Failed to add exercise", error);
@@ -75,10 +92,27 @@ export function ExerciseSearchList({ exercises, dayId }: { exercises: Exercise[]
         />
       </div>
 
+      {/* Horizontal Filter Bubbles */}
+      <div className="flex gap-2 overflow-x-auto pb-1 shrink-0 snap-x [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        {MUSCLE_FILTERS.map((filter) => (
+          <button
+            key={filter}
+            onClick={() => setActiveFilter(filter)}
+            className={`snap-start shrink-0 rounded-full px-4 py-1.5 text-xs font-bold transition-all border ${
+              activeFilter === filter
+                ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                : 'bg-muted/30 text-muted-foreground border-border/50 hover:bg-muted/80'
+            }`}
+          >
+            {filter}
+          </button>
+        ))}
+      </div>
+
       {/* Filtered List */}
-      <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+      <div className="flex-1 overflow-y-auto space-y-2 pr-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {filteredExercises.length === 0 ? (
-          <p className="text-center text-sm text-muted mt-8">No exercises match "{query}".</p>
+          <p className="text-center text-sm text-muted mt-8">No exercises match your search.</p>
         ) : (
             filteredExercises.map((exercise) => (
             <Card key={exercise.id} className="flex items-center justify-between p-3 hover:border-primary/50 transition-colors">
