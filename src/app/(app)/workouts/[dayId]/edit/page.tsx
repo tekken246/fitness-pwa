@@ -1,7 +1,7 @@
 import { eq, asc } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Trash2, GripVertical, Plus, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Trash2, GripVertical, Plus, CheckCircle2, Dumbbell } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { db } from '@/db/client';
