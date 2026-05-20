@@ -1,12 +1,11 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { sql, eq, and, max, sum } from 'drizzle-orm';
+import { sql, eq, and, max, sum, asc } from 'drizzle-orm';
 import { Trophy, Calendar, TrendingUp } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { db } from '@/db/client';
-// Fixed Import: Added setEntries
 import { exercises, workoutExerciseEntries, workoutSessions, setEntries } from '@/db/schema';
 import { ExerciseSelector } from '@/components/progress/exercise-selector';
 import { requireClerkUserId } from '@/lib/auth';
@@ -20,48 +19,94 @@ export default async function ProgressPage({ searchParams }: PageProps): Promise
   const { exercise } = await searchParams;
   const clerkUserId = await requireClerkUserId();
   
-  // 1. Fetch User Settings for dynamic units
   const settings = await getOrCreateUserSettings(clerkUserId);
   const unitLabel = settings.unit; 
 
-  // 2. Fetch available system exercises
-  const dbExercises = await db.select().from(exercises).orderBy(exercises.name);
-  const currentExerciseName = exercise || dbExercises[0]?.name || "Flat Bench Press";
+  // 1. Fetch Exercises Sorted by "Last Logged" (Most recent at the top)
+  const dbExercises = await db
+    .select({
+      id: exercises.id,
+      name: exercises.name,
+      lastLogged: max(workoutSessions.startedAt),
+    })
+    .from(exercises)
+    .leftJoin(workoutExerciseEntries, eq(workoutExerciseEntries.exerciseId, exercises.id))
+    .leftJoin(
+      workoutSessions,
+      and(
+        eq(workoutSessions.id, workoutExerciseEntries.sessionId),
+        eq(workoutSessions.clerkUserId, clerkUserId)
+      )
+    )
+    .groupBy(exercises.id, exercises.name)
+    // Sort by latest session date descending. NULLS LAST pushes unused exercises to the bottom.
+    .orderBy(sql`MAX(${workoutSessions.startedAt}) DESC NULLS LAST`, exercises.name);
 
-  // 3. Find exact database ID
+  // Clean the array for the client component
+  const exercisesForSelector = dbExercises.map((ex) => ({ id: ex.id, name: ex.name }));
+  const currentExerciseName = exercise || exercisesForSelector[0]?.name || "Flat Bench Press";
   const currentExerciseObj = dbExercises.find(ex => ex.name === currentExerciseName) || dbExercises[0];
 
-  // 4. LIVE AGGREGATION
+  // 2. LIVE AGGREGATION & CHART DATA
   let bestWeight = 0;
   let totalVolume = 0;
   let estimated1RM = 0;
+  
+  // Array to hold historical chart data
+  let chartData: { date: string; weight: number }[] = [];
 
   if (currentExerciseObj) {
+    // A. Fetch All-Time Stats
     const stats = await db
       .select({
-        // Fixed: Pulling from setEntries
         maxWeight: max(setEntries.weight),
         volume: sum(sql`${setEntries.weight} * ${setEntries.reps}`),
       })
       .from(workoutExerciseEntries)
       .innerJoin(workoutSessions, eq(workoutSessions.id, workoutExerciseEntries.sessionId))
-      // Fixed: Join the setEntries table
       .innerJoin(setEntries, eq(setEntries.workoutExerciseEntryId, workoutExerciseEntries.id))
       .where(
         and(
           eq(workoutSessions.clerkUserId, clerkUserId),
           eq(workoutExerciseEntries.exerciseId, currentExerciseObj.id),
-          eq(setEntries.completed, true) // Only count completed sets!
+          eq(setEntries.completed, true)
         )
       );
 
-      if (stats[0]) {
-        // Safely converts whether Drizzle returns a number, a string, or null
-        bestWeight = Number(stats[0].maxWeight) || 0;
-        totalVolume = Number(stats[0].volume) || 0;
-        estimated1RM = bestWeight > 0 ? Math.round(bestWeight * 1.033) : 0; 
-      }
+    if (stats[0]) {
+      bestWeight = Number(stats[0].maxWeight) || 0;
+      totalVolume = Number(stats[0].volume) || 0;
+      estimated1RM = bestWeight > 0 ? Math.round(bestWeight * 1.033) : 0; 
+    }
+
+    // B. Fetch Timeline Data for the Chart (Last 7 Sessions)
+    const history = await db
+      .select({
+        date: workoutSessions.localDate,
+        maxWeight: max(setEntries.weight),
+      })
+      .from(workoutExerciseEntries)
+      .innerJoin(workoutSessions, eq(workoutSessions.id, workoutExerciseEntries.sessionId))
+      .innerJoin(setEntries, eq(setEntries.workoutExerciseEntryId, workoutExerciseEntries.id))
+      .where(
+        and(
+          eq(workoutSessions.clerkUserId, clerkUserId),
+          eq(workoutExerciseEntries.exerciseId, currentExerciseObj.id),
+          eq(setEntries.completed, true)
+        )
+      )
+      .groupBy(workoutSessions.localDate)
+      .orderBy(asc(workoutSessions.localDate))
+      .limit(7);
+
+    chartData = history.map((d) => ({
+      date: d.date.slice(5), // Keep only MM-DD for clean labels
+      weight: Number(d.maxWeight) || 0,
+    }));
   }
+
+  // Calculate the highest value in the chart to scale the bars dynamically
+  const chartMaxWeight = Math.max(...chartData.map(d => d.weight), 1);
 
   return (
     <div className="space-y-6 pb-28 text-white">
@@ -82,14 +127,20 @@ export default async function ProgressPage({ searchParams }: PageProps): Promise
       </Card>
 
       <div className="px-1">
-        <ExerciseSelector exercises={dbExercises} currentExercise={currentExerciseName} />
+        <ExerciseSelector exercises={exercisesForSelector} currentExercise={currentExerciseName} />
       </div>
 
       <div className="px-1 py-1 flex items-center justify-between">
         <h2 className="text-[17px] font-bold text-white tracking-tight">{currentExerciseName} Stats</h2>
-        <div className="inline-flex items-center gap-1.5 rounded-full bg-[#22C55E]/15 px-3 py-1 border border-[#22C55E]/30 text-[#22C55E] text-[12px] font-semibold">
-          <TrendingUp className="h-3.5 w-3.5" /> Stable Trend
-        </div>
+        {chartData.length >= 2 && chartData[chartData.length - 1].weight >= chartData[chartData.length - 2].weight ? (
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-[#22C55E]/15 px-3 py-1 border border-[#22C55E]/30 text-[#22C55E] text-[12px] font-semibold">
+            <TrendingUp className="h-3.5 w-3.5" /> Improving Trend
+          </div>
+        ) : chartData.length > 0 ? (
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 border border-white/20 text-white/70 text-[12px] font-semibold">
+            Stable Trend
+          </div>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-3 gap-2 px-1">
@@ -119,14 +170,39 @@ export default async function ProgressPage({ searchParams }: PageProps): Promise
       </div>
 
       <Card className="rounded-[20px] border-white/[0.08] bg-white/[0.03] p-5">
-        <h3 className="text-[13px] font-semibold text-white/70 mb-4">Performance Tracking</h3>
-        <div className="flex h-[130px] w-full items-center justify-center rounded-[12px] border border-dashed border-white/10 bg-white/[0.02]">
-           <p className="text-[13px] text-white/30 px-6 text-center">
-             {bestWeight > 0 
-                ? `You have logged data for ${currentExerciseName}. A visual chart will appear here as you log more sessions.`
-                : `Complete a session with ${currentExerciseName} to see your history chart.`
-             }
-           </p>
+        <h3 className="text-[13px] font-semibold text-white/70 mb-4">Max Weight Over Time</h3>
+        
+        {/* NATIVE TAILWIND BAR CHART */}
+        <div className="flex h-[140px] w-full items-end justify-between gap-2 rounded-[12px] border border-dashed border-white/10 bg-white/[0.02] p-4 pt-8">
+           {chartData.length > 0 ? (
+             chartData.map((dataPoint, index) => {
+               // Calculate height percentage relative to the maximum weight in the chart (minimum height 10%)
+               const heightPercentage = Math.max((dataPoint.weight / chartMaxWeight) * 100, 10);
+               
+               return (
+                 <div key={index} className="flex flex-1 flex-col items-center justify-end h-full gap-2 group">
+                   <div className="relative w-full flex justify-center h-full items-end">
+                     {/* Hover Tooltip */}
+                     <span className="absolute -top-6 text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                       {dataPoint.weight}
+                     </span>
+                     {/* The Bar */}
+                     <div 
+                       className="w-full max-w-[28px] bg-[#22C55E] rounded-t-sm hover:bg-[#22C55E]/80 transition-all duration-300"
+                       style={{ height: `${heightPercentage}%` }}
+                     />
+                   </div>
+                   <span className="text-[10px] font-semibold text-white/40 tracking-tighter">{dataPoint.date}</span>
+                 </div>
+               );
+             })
+           ) : (
+             <div className="flex w-full items-center justify-center h-full pb-4">
+               <p className="text-[13px] text-white/30 text-center">
+                 Complete a session with {currentExerciseName} to see your history chart.
+               </p>
+             </div>
+           )}
         </div>
       </Card>
     </div>
