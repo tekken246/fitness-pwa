@@ -55,11 +55,12 @@ export default async function ProgressPage({ searchParams }: PageProps): Promise
         )
       );
 
-    if (stats[0]) {
-      bestWeight = parseFloat(stats[0].maxWeight as string) || 0;
-      totalVolume = parseFloat(stats[0].volume as string) || 0;
-      estimated1RM = bestWeight > 0 ? Math.round(bestWeight * 1.033) : 0; 
-    }
+      if (stats[0]) {
+        // Safely converts whether Drizzle returns a number, a string, or null
+        bestWeight = Number(stats[0].maxWeight) || 0;
+        totalVolume = Number(stats[0].volume) || 0;
+        estimated1RM = bestWeight > 0 ? Math.round(bestWeight * 1.033) : 0; 
+      }
   }
 
   return (
