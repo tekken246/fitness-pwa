@@ -7,9 +7,9 @@ import { userSettings } from '@/db/schema';
 import type { ThemePreference, UnitPreference, UserSettings } from '@/lib/types';
 
 const DEFAULT_SETTINGS: Omit<UserSettings, 'clerkUserId'> = {
-  unit: 'lb',
+  unit: 'kg',
   theme: 'dark',
-  timezone: 'UTC',
+  timezone: 'Asia/Kolkata',
 };
 
 /** Gets settings for the user, creating defaults on first access. */
