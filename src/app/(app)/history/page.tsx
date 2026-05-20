@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import { Search, ChevronRight, Activity, Clock, Dumbbell, Trophy } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { db } from '@/db/client';
 import { workoutSessions, workoutTemplateDays, workoutExerciseEntries, exercises } from '@/db/schema';
 import { requireClerkUserId } from '@/lib/auth';
+import { getOrCreateUserSettings } from '@/lib/data/settings';
 
 interface PageProps {
   searchParams: Promise<{ tab?: string }>;
@@ -16,7 +17,10 @@ export default async function HistoryPage({ searchParams }: PageProps): Promise<
   const { tab = 'sessions' } = await searchParams;
   const clerkUserId = await requireClerkUserId();
   
-  // 1. Fetch live sessions
+  // Fetch user settings to ensure timezone accuracy for the calendar
+  const settings = await getOrCreateUserSettings(clerkUserId);
+  
+  // 1. Fetch live sessions for the list
   const realSessions = await db
     .select({
       id: workoutSessions.id,
@@ -30,7 +34,7 @@ export default async function HistoryPage({ searchParams }: PageProps): Promise<
     .where(eq(workoutSessions.clerkUserId, clerkUserId))
     .orderBy(desc(workoutSessions.startedAt));
 
-  // 2. Fetch distinct logged exercises (Fixing the hardcoded list!)
+  // 2. Fetch distinct logged exercises for the Exercises tab
   const loggedExercises = await db
     .selectDistinct({
       id: exercises.id,
@@ -42,10 +46,42 @@ export default async function HistoryPage({ searchParams }: PageProps): Promise<
     .where(eq(workoutSessions.clerkUserId, clerkUserId))
     .limit(20);
 
-  const heatmapDays = Array.from({ length: 28 }).map((_, i) => ({
-    date: new Date(Date.now() - i * 24 * 60 * 60 * 1000),
-    intensity: Math.random() > 0.5 ? Math.floor(Math.random() * 3) + 1 : 0,
-  })).reverse();
+  // 3. LIVE HEATMAP DATA: Count workouts grouped by day
+  const activityQuery = await db
+    .select({
+      localDate: workoutSessions.localDate,
+      count: sql<number>`count(${workoutSessions.id})`
+    })
+    .from(workoutSessions)
+    .where(eq(workoutSessions.clerkUserId, clerkUserId))
+    .groupBy(workoutSessions.localDate);
+
+  // Generate the last 28 days mapped to actual database activity
+  const now = new Date();
+  const heatmapDays = Array.from({ length: 28 }).map((_, i) => {
+    // Calculate the date for this specific square (0 = 27 days ago, 27 = today)
+    const d = new Date(now.getTime() - (27 - i) * 24 * 60 * 60 * 1000);
+    
+    // Format the date securely matching the database format (YYYY-MM-DD) based on your timezone
+    const formatter = new Intl.DateTimeFormat('sv-SE', {
+      timeZone: settings.timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    const dateStr = formatter.format(d);
+    
+    // Check if we have workout data for this day
+    const dayData = activityQuery.find(a => a.localDate === dateStr);
+    let intensity = 0;
+    
+    if (dayData) {
+      // 1 workout = Medium Green (Intensity 2). Multiple workouts = Bright Green (Intensity 3).
+      intensity = Math.min(Number(dayData.count) + 1, 3);
+    }
+    
+    return { date: dateStr, intensity };
+  });
 
   const muscleFilters = ['All', 'Chest', 'Back', 'Shoulders', 'Arms', 'Legs'];
 
@@ -76,6 +112,7 @@ export default async function HistoryPage({ searchParams }: PageProps): Promise<
 
       {tab === 'sessions' && (
         <div className="space-y-4 animate-in fade-in duration-200">
+          {/* Live Heatmap Container */}
           <div className="px-1 space-y-2">
             <h3 className="text-[13px] font-semibold text-white/70">Activity (Last 4 Weeks)</h3>
             <div className="flex gap-2 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
@@ -83,12 +120,13 @@ export default async function HistoryPage({ searchParams }: PageProps): Promise<
                 {heatmapDays.map((day, i) => (
                   <div 
                     key={i} 
+                    title={day.intensity > 0 ? `Workout logged on ${day.date}` : `Rest day on ${day.date}`}
                     className={`h-[14px] w-[14px] rounded-[3px] transition-colors ${
                       day.intensity === 0 ? 'bg-white/[0.04]' :
                       day.intensity === 1 ? 'bg-[#22C55E]/30' :
                       day.intensity === 2 ? 'bg-[#22C55E]/60' :
-                      'bg-[#22C55E]'
-                    } ${i === 27 ? 'border border-white/50' : ''}`}
+                      'bg-[#22C55E]' // Deep green for heavy days
+                    } ${i === 27 ? 'border border-white/50' : ''}`} // Highlights today with a white border
                   />
                 ))}
               </div>
