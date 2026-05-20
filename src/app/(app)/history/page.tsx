@@ -56,13 +56,25 @@ export default async function HistoryPage({ searchParams }: PageProps): Promise<
     .where(eq(workoutSessions.clerkUserId, clerkUserId))
     .groupBy(workoutSessions.localDate);
 
-  // Generate the last 28 days mapped to actual database activity
+  // Get today's day of week securely in user's timezone
   const now = new Date();
+  const formatterEn = new Intl.DateTimeFormat('en-US', {
+    timeZone: settings.timezone,
+    weekday: 'short',
+  });
+  const todayStr = formatterEn.format(now);
+  
+  // Map to align Monday as 0, Sunday as 6
+  const daysMap: Record<string, number> = { 'Mon': 0, 'Tue': 1, 'Wed': 2, 'Thu': 3, 'Fri': 4, 'Sat': 5, 'Sun': 6 };
+  const adjustedDay = daysMap[todayStr] ?? 0;
+
+  // Generate 28 days perfectly aligned to Mon-Sun rows ending on the current week's Sunday
   const heatmapDays = Array.from({ length: 28 }).map((_, i) => {
-    // Calculate the date for this specific square (0 = 27 days ago, 27 = today)
-    const d = new Date(now.getTime() - (27 - i) * 24 * 60 * 60 * 1000);
+    // Math to ensure the first square is ALWAYS exactly 4 Mondays ago.
+    const daysAgo = (21 + adjustedDay) - i;
+    const d = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
     
-    // Format the date securely matching the database format (YYYY-MM-DD) based on your timezone
+    // Format the date securely matching the database format (YYYY-MM-DD)
     const formatter = new Intl.DateTimeFormat('sv-SE', {
       timeZone: settings.timezone,
       year: 'numeric',
@@ -80,9 +92,15 @@ export default async function HistoryPage({ searchParams }: PageProps): Promise<
       intensity = Math.min(Number(dayData.count) + 1, 3);
     }
     
-    return { date: dateStr, intensity };
+    return { 
+      date: dateStr, 
+      intensity, 
+      isFuture: daysAgo < 0, 
+      isToday: daysAgo === 0 
+    };
   });
 
+  const weekDayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   const muscleFilters = ['All', 'Chest', 'Back', 'Shoulders', 'Arms', 'Legs'];
 
   return (
@@ -112,21 +130,36 @@ export default async function HistoryPage({ searchParams }: PageProps): Promise<
 
       {tab === 'sessions' && (
         <div className="space-y-4 animate-in fade-in duration-200">
-          {/* Live Heatmap Container */}
-          <div className="px-1 space-y-2">
+          
+          {/* =========================================
+              NEW: HORIZONTAL CALENDAR HEATMAP 
+              ========================================= */}
+          <div className="px-1 space-y-3">
             <h3 className="text-[13px] font-semibold text-white/70">Activity (Last 4 Weeks)</h3>
-            <div className="flex gap-2 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-              <div className="grid grid-rows-4 grid-flow-col gap-1.5">
+            
+            <div className="w-full">
+              {/* Day Headers (M T W T F S S) */}
+              <div className="grid grid-cols-7 gap-1.5 mb-1.5">
+                {weekDayLabels.map((label, i) => (
+                  <div key={i} className="text-center text-[10px] font-bold text-white/40">
+                    {label}
+                  </div>
+                ))}
+              </div>
+              
+              {/* Grid Populated Horizontally */}
+              <div className="grid grid-cols-7 gap-1.5">
                 {heatmapDays.map((day, i) => (
                   <div 
                     key={i} 
-                    title={day.intensity > 0 ? `Workout logged on ${day.date}` : `Rest day on ${day.date}`}
-                    className={`h-[14px] w-[14px] rounded-[3px] transition-colors ${
-                      day.intensity === 0 ? 'bg-white/[0.04]' :
+                    title={day.isFuture ? '' : day.intensity > 0 ? `Workout logged on ${day.date}` : `Rest day on ${day.date}`}
+                    className={`aspect-square w-full rounded-[4px] transition-colors ${
+                      day.isFuture ? 'bg-transparent border border-white/[0.02]' :
+                      day.intensity === 0 ? 'bg-white/[0.04] hover:bg-white/[0.06]' :
                       day.intensity === 1 ? 'bg-[#22C55E]/30' :
                       day.intensity === 2 ? 'bg-[#22C55E]/60' :
                       'bg-[#22C55E]' // Deep green for heavy days
-                    } ${i === 27 ? 'border border-white/50' : ''}`} // Highlights today with a white border
+                    } ${day.isToday ? 'border-[1.5px] border-white/70' : ''}`} // Highlights today
                   />
                 ))}
               </div>
