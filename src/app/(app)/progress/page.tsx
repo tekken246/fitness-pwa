@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { sql, eq, and, max, sum, desc } from 'drizzle-orm';
-import { Trophy, Calendar, TrendingUp, Dumbbell } from 'lucide-react';
+import { sql, eq, and, max, sum } from 'drizzle-orm';
+import { Trophy, Calendar, TrendingUp } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { db } from '@/db/client';
-import { exercises, workoutExerciseEntries, workoutSessions } from '@/db/schema';
+// Fixed Import: Added setEntries
+import { exercises, workoutExerciseEntries, workoutSessions, setEntries } from '@/db/schema';
 import { ExerciseSelector } from '@/components/progress/exercise-selector';
 import { requireClerkUserId } from '@/lib/auth';
 import { getOrCreateUserSettings } from '@/lib/data/settings';
@@ -19,7 +20,7 @@ export default async function ProgressPage({ searchParams }: PageProps): Promise
   const { exercise } = await searchParams;
   const clerkUserId = await requireClerkUserId();
   
-  // 1. Fetch User Settings for dynamic units ('kg' vs 'lb')
+  // 1. Fetch User Settings for dynamic units
   const settings = await getOrCreateUserSettings(clerkUserId);
   const unitLabel = settings.unit; 
 
@@ -27,10 +28,10 @@ export default async function ProgressPage({ searchParams }: PageProps): Promise
   const dbExercises = await db.select().from(exercises).orderBy(exercises.name);
   const currentExerciseName = exercise || dbExercises[0]?.name || "Flat Bench Press";
 
-  // 3. Find the exact database ID for the currently selected exercise
+  // 3. Find exact database ID
   const currentExerciseObj = dbExercises.find(ex => ex.name === currentExerciseName) || dbExercises[0];
 
-  // 4. LIVE AGGREGATION: Calculate real metrics for this user and this exercise
+  // 4. LIVE AGGREGATION
   let bestWeight = 0;
   let totalVolume = 0;
   let estimated1RM = 0;
@@ -38,35 +39,27 @@ export default async function ProgressPage({ searchParams }: PageProps): Promise
   if (currentExerciseObj) {
     const stats = await db
       .select({
-        maxWeight: max(workoutExerciseEntries.weight),
-        volume: sum(sql`${workoutExerciseEntries.weight} * ${workoutExerciseEntries.reps}`),
+        // Fixed: Pulling from setEntries
+        maxWeight: max(setEntries.weight),
+        volume: sum(sql`${setEntries.weight} * ${setEntries.reps}`),
       })
       .from(workoutExerciseEntries)
       .innerJoin(workoutSessions, eq(workoutSessions.id, workoutExerciseEntries.sessionId))
+      // Fixed: Join the setEntries table
+      .innerJoin(setEntries, eq(setEntries.workoutExerciseEntryId, workoutExerciseEntries.id))
       .where(
         and(
           eq(workoutSessions.clerkUserId, clerkUserId),
-          eq(workoutExerciseEntries.exerciseId, currentExerciseObj.id)
+          eq(workoutExerciseEntries.exerciseId, currentExerciseObj.id),
+          eq(setEntries.completed, true) // Only count completed sets!
         )
       );
 
     if (stats[0]) {
-      // Drizzle aggregate functions return strings for numeric sums, so we parse them
       bestWeight = parseFloat(stats[0].maxWeight as string) || 0;
       totalVolume = parseFloat(stats[0].volume as string) || 0;
-      
-      // Basic Epley Formula for 1RM: Weight * (1 + (Reps / 30))
-      // Since we are doing a quick dashboard view, we'll rough estimate it based on best weight.
-      // In a production app, you'd calculate this per-set.
       estimated1RM = bestWeight > 0 ? Math.round(bestWeight * 1.033) : 0; 
     }
-  }
-
-  // 5. Action to update URL params
-  async function handleSelectAction(formData: FormData) {
-    'use server';
-    const selected = formData.get('exerciseSearch') as string;
-    redirect(`/progress?exercise=${encodeURIComponent(selected)}`);
   }
 
   return (
@@ -98,7 +91,6 @@ export default async function ProgressPage({ searchParams }: PageProps): Promise
         </div>
       </div>
 
-      {/* LIVE DATA INJECTED HERE WITH DYNAMIC UNITS */}
       <div className="grid grid-cols-3 gap-2 px-1">
         <Card className="flex flex-col items-center justify-center rounded-[16px] border-white/[0.08] bg-white/[0.05] p-4 text-center">
           <p className="text-[18px] font-bold text-white">
