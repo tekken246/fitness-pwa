@@ -47,6 +47,7 @@ export type SetEntryView = {
   unit: UnitPreference | 'none';
   rpe: number | null;
   completed: boolean;
+  completedAt?: string | null; // <--- ADDED THIS TO FIX THE BUILD ERROR
 };
 
 export type PreviousPerformance = {
@@ -77,7 +78,7 @@ export type WorkoutSessionView = {
   localDate: string;
   timezone: string;
   status: SessionStatus;
-  startedAt: Date; // <--- WE ADDED THIS HERE
+  startedAt: Date; 
   notes: string;
   day: {
     id: string;

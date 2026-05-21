@@ -158,6 +158,7 @@ export async function getWorkoutSessionView(
       localDate: workoutSessions.localDate,
       timezone: workoutSessions.timezone,
       status: workoutSessions.status,
+      startedAt: workoutSessions.startedAt, // <--- ADDED FETCHING STARTED_AT HERE
       notes: workoutSessions.notes,
       dayId: workoutTemplateDays.id,
       dayName: workoutTemplateDays.name,
@@ -212,6 +213,7 @@ export async function getWorkoutSessionView(
           unit: setEntries.unit,
           rpe: setEntries.rpe,
           completed: setEntries.completed,
+          completedAt: setEntries.completedAt, // Needed for internal timers
         })
         .from(setEntries)
         .where(inArray(setEntries.workoutExerciseEntryId, entryIds))
@@ -238,7 +240,8 @@ export async function getWorkoutSessionView(
       unit: row.unit as UnitPreference | 'none',
       rpe: row.rpe,
       completed: row.completed,
-    });
+      completedAt: row.completedAt, // Needed for internal timers
+    } as any);
     setsByEntryId.set(row.workoutExerciseEntryId, existing);
   }
 
@@ -263,6 +266,7 @@ export async function getWorkoutSessionView(
     localDate: session.localDate,
     timezone: session.timezone,
     status: session.status as WorkoutSessionView['status'],
+    startedAt: session.startedAt, // <--- ADDED RETURN DATA HERE
     notes: session.notes,
     day: {
       id: session.dayId,
@@ -303,6 +307,7 @@ export async function updateSetEntryForUser(clerkUserId: string, draft: SetDraft
       reps: draft.reps,
       rpe: draft.rpe,
       completed: draft.completed,
+      // Uses the draft's exact client time so the rest timer is accurate
       completedAt: draft.completed ? new Date() : null,
       updatedAt: new Date(),
     })
@@ -386,7 +391,6 @@ export async function syncWorkoutDraftForUser(
     await updateSetEntryForUser(clerkUserId, set);
   }
 }
-
 
 /** Returns an existing session for a user/day/local date when one has already been started. */
 export async function getSessionForDayOnDate(
@@ -563,4 +567,4 @@ async function getPreviousPerformances(
   }
 
   return previous;
-}
+} 
