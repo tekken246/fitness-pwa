@@ -77,6 +77,7 @@ export type WorkoutSessionView = {
   localDate: string;
   timezone: string;
   status: SessionStatus;
+  startedAt: Date; // <--- WE ADDED THIS HERE
   notes: string;
   day: {
     id: string;
