@@ -1,9 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { SetEntryRow } from '@/components/workout/set-entry-row';
 import type { SetEntryView, WorkoutExerciseEntryView } from '@/lib/types';
+import { OCM_EXERCISE_HELP, OCM_toExerciseSlug } from '@/lib/data/exercise-help';
+import { ExerciseHelpButton, ExerciseHelpSheet } from '@/components/workout/exercise-help-sheet';
 
 type ExerciseCardProps = {
   exercise: WorkoutExerciseEntryView;
@@ -15,12 +18,22 @@ type ExerciseCardProps = {
 /** Renders an exercise block with set logging and previous performance. */
 export function ExerciseCard({ exercise, nextExerciseCompletedAt, onSetChange, onNotesChange }: ExerciseCardProps): ReactNode {
   const previous = exercise.previousPerformance;
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+
+  // Attempt to match exercise against our help database
+  const exerciseSlug = OCM_toExerciseSlug(exercise.displayName);
+  const exerciseHelp = OCM_EXERCISE_HELP[exerciseSlug] || null;
 
   return (
     <section className="space-y-4 rounded-[20px] border border-white/[0.08] bg-white/[0.05] p-5 shadow-sm transition-all hover:border-white/[0.12]">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/45">Exercise {exercise.position}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/45">Exercise {exercise.position}</p>
+            {exerciseHelp && (
+              <ExerciseHelpButton onClick={() => setIsHelpOpen(true)} exerciseName={exercise.displayName} />
+            )}
+          </div>
           <h2 className="mt-1 text-[20px] font-bold tracking-tight text-white">{exercise.displayName}</h2>
           {exercise.targetNote ? <p className="mt-1 text-[13px] text-white/50">{exercise.targetNote}</p> : null}
         </div>
@@ -41,8 +54,6 @@ export function ExerciseCard({ exercise, nextExerciseCompletedAt, onSetChange, o
       <div className="space-y-2 pt-2">
         {exercise.sets.map((set, index) => {
           const nextSet = exercise.sets[index + 1];
-          
-          // If this is the last set of the exercise, use the cross-exercise look-ahead time!
           const resolvedNextCompletedAt = nextSet?.completedAt || (index === exercise.sets.length - 1 ? nextExerciseCompletedAt : null);
 
           return (
@@ -66,6 +77,13 @@ export function ExerciseCard({ exercise, nextExerciseCompletedAt, onSetChange, o
           value={exercise.notes}
         />
       </label>
+
+      {/* Render Portal Bottom Sheet */}
+      <ExerciseHelpSheet 
+        exerciseHelp={exerciseHelp} 
+        isOpen={isHelpOpen} 
+        onClose={() => setIsHelpOpen(false)} 
+      />
     </section>
   );
 }
