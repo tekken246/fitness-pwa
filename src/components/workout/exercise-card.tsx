@@ -47,16 +47,13 @@ export function ExerciseCard({ exercise, nextExerciseCompletedAt, onSetChange, o
   const slug = OCM_toExerciseSlug(exercise.displayName);
   const fallback = OCM_EXERCISE_HELP[slug] || null;
 
-  // 3. Do we have ANY data to show?
-  const hasHelpData = !!dbInstructions || !!fallback;
-
-  // 4. Construct the final data object for the Bottom Sheet
-  const sheetData = hasHelpData ? {
+  // 3. Construct the final data object for the Bottom Sheet (Always provide data)
+  const sheetData = {
     name: exercise.displayName,
     images: dbImages || fallback?.images || [],
-    instructions: dbInstructions || (fallback ? [...fallback.setup, ...fallback.execution] : []),
+    instructions: dbInstructions || (fallback ? [...fallback.setup, ...fallback.execution] : ['Specific visual instructions for this custom exercise variation are currently unavailable.']),
     primaryMuscles: dbMuscles || fallback?.targetMuscles || []
-  } : null;
+  };
 
   return (
     <section className="space-y-4 rounded-[20px] border border-white/[0.08] bg-white/[0.05] p-5 shadow-sm transition-all hover:border-white/[0.12]">
@@ -64,9 +61,8 @@ export function ExerciseCard({ exercise, nextExerciseCompletedAt, onSetChange, o
         <div>
           <div className="flex items-center gap-2">
             <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/45">Exercise {exercise.position}</p>
-            {hasHelpData && (
-              <ExerciseHelpButton onClick={() => setIsHelpOpen(true)} exerciseName={exercise.displayName} />
-            )}
+            {/* Always render the button now */}
+            <ExerciseHelpButton onClick={() => setIsHelpOpen(true)} exerciseName={exercise.displayName} />
           </div>
           <h2 className="mt-1 text-[20px] font-bold tracking-tight text-white">{exercise.displayName}</h2>
           {exercise.targetNote ? <p className="mt-1 text-[13px] text-white/50">{exercise.targetNote}</p> : null}
@@ -119,4 +115,4 @@ export function ExerciseCard({ exercise, nextExerciseCompletedAt, onSetChange, o
       />
     </section>
   );
-} 
+}
