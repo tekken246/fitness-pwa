@@ -17,91 +17,112 @@ export type ExerciseHelpData = {
   avoid: string[];
 };
 
+// Fallback dictionary for exercises missing from the external database
 export const OCM_EXERCISE_HELP: Record<string, ExerciseHelpData> = {
-  'close-grip-bench-press': {
-    id: 'close-grip-bench-press',
-    name: 'Close-Grip Bench Press',
-    asset: '/assets/exercises/close-grip-bench-press.webp',
-    assetAlt: 'Close-Grip Bench Press start and active positions',
-    targetMuscles: ['Triceps', 'Chest', 'Front Delts'],
-    setup: [
-      'Lie flat on the bench with feet planted.',
-      'Grip the bar slightly narrower than shoulder width.',
-      'Keep wrists stacked over elbows.',
-    ],
-    execution: [
-      'Lower the bar under control toward the lower chest.',
-      'Keep elbows tucked close to the torso.',
-      'Press the bar up without locking out aggressively.',
-    ],
-    avoid: [
-      'Do not flare elbows wide.',
-      'Do not bounce the bar off the chest.',
-      'Do not let wrists bend backward.',
-    ],
-  },
-  'skull-crushers': {
-    id: 'skull-crushers',
-    name: 'Skull Crushers',
-    asset: '/assets/exercises/skull-crushers.webp',
-    assetAlt: 'Skull Crushers start and active positions',
-    targetMuscles: ['Triceps'],
-    setup: [
-      'Lie on a flat bench with arms extended above shoulders.',
-      'Hold the bar or dumbbells with wrists neutral.',
-      'Keep upper arms mostly fixed.',
-    ],
-    execution: [
-      'Bend elbows to lower the weight toward the forehead or slightly behind the head.',
-      'Extend elbows to return to the start position.',
-      'Control the negative on every rep.',
-    ],
-    avoid: [
-      'Do not let elbows drift outward.',
-      'Do not move shoulders excessively.',
-      'Do not use momentum.',
-    ],
-  },
   'flat-bench-press': {
     id: 'flat-bench-press',
     name: 'Flat Bench Press',
     asset: '/assets/exercises/flat-bench-press.webp',
-    assetAlt: 'Flat Bench Press',
+    assetAlt: 'Flat Bench Press execution',
     targetMuscles: ['Chest', 'Front Delts', 'Triceps'],
     setup: [
-      'Lie flat on the bench with eyes under the bar.',
-      'Plant feet firmly on the floor.',
-      'Grip the bar slightly wider than shoulder width.',
+      'Lie flat on the bench with eyes directly under the bar.',
+      'Plant your feet firmly on the floor.',
+      'Grip the bar slightly wider than shoulder-width.',
     ],
     execution: [
-      'Unrack the bar and stabilize.',
-      'Lower the bar to the mid-chest under control.',
-      'Press forcefully back to the starting position.',
+      'Unrack the bar and stabilize it over your chest.',
+      'Lower the bar under control to your mid-chest.',
+      'Press the bar up powerfully to the starting position.',
     ],
     avoid: [
       'Do not bounce the bar off your chest.',
       'Do not lift your hips off the bench.',
+      'Do not flare your elbows at 90 degrees.',
+    ],
+  },
+  'incline-dumbbell-press': {
+    id: 'incline-dumbbell-press',
+    name: 'Incline Dumbbell Press',
+    asset: '/assets/exercises/incline-dumbbell-press.webp',
+    assetAlt: 'Incline Dumbbell Press execution',
+    targetMuscles: ['Upper Chest', 'Front Delts', 'Triceps'],
+    setup: [
+      'Set an incline bench to 30-45 degrees.',
+      'Kick the dumbbells up to your shoulders and lean back.',
+      'Retract your shoulder blades and puff your chest out.',
+    ],
+    execution: [
+      'Press the dumbbells straight up until your arms are fully extended.',
+      'Lower the weights slowly until they are level with your upper chest.',
+      'Keep your elbows tucked at a 45-degree angle.',
+    ],
+    avoid: [
+      'Do not let the dumbbells drift over your face or stomach.',
+      'Do not slam the dumbbells together at the top.',
     ],
   },
   'cable-fly': {
     id: 'cable-fly',
     name: 'Cable Fly',
     asset: '/assets/exercises/cable-fly.webp',
-    assetAlt: 'Cable Fly',
+    assetAlt: 'Cable Fly execution',
     targetMuscles: ['Chest'],
     setup: [
       'Set pulleys to chest height.',
-      'Take a staggered stance for stability.',
-      'Maintain a slight bend in the elbows.',
+      'Grab handles, step forward, and take a staggered stance.',
+      'Keep a slight bend in your elbows and a proud chest.',
     ],
     execution: [
-      'Bring the handles together in a hugging motion.',
-      'Squeeze the chest at peak contraction.',
-      'Slowly return to the start position.',
+      'Bring the handles together in a wide hugging motion.',
+      'Squeeze your chest hard at peak contraction.',
+      'Slowly reverse the motion until you feel a stretch in your pecs.',
     ],
     avoid: [
-      'Do not press the weight (keep the hugging motion).',
-      'Do not let the weight pull your shoulders back too far.',
+      'Do not press the weight; maintain the hugging arc.',
+      'Do not let the weight pull your shoulders out of position.',
+    ],
+  },
+  'pec-deck': {
+    id: 'pec-deck',
+    name: 'Pec Deck',
+    asset: '/assets/exercises/pec-deck.webp',
+    assetAlt: 'Pec Deck execution',
+    targetMuscles: ['Chest', 'Inner Chest'],
+    setup: [
+      'Adjust the seat so the handles are at chest level.',
+      'Keep your back flat against the pad and chest up.',
+      'Grip the handles with a slight bend in your elbows.',
+    ],
+    execution: [
+      'Bring the handles together in front of your chest.',
+      'Hold the contraction for a split second.',
+      'Slowly return to the starting position.',
+    ],
+    avoid: [
+      'Do not use momentum to swing the weight.',
+      'Do not let the weight stack rest between reps.',
+    ],
+  },
+  'tricep-pushdown': {
+    id: 'tricep-pushdown',
+    name: 'Tricep Pushdown',
+    asset: '/assets/exercises/tricep-pushdown.webp',
+    assetAlt: 'Tricep Pushdown execution',
+    targetMuscles: ['Triceps'],
+    setup: [
+      'Attach a rope or straight bar to a high pulley.',
+      'Grip the attachment and pin your elbows to your sides.',
+      'Lean slightly forward with a braced core.',
+    ],
+    execution: [
+      'Push the attachment down until your arms are fully extended.',
+      'Flex your triceps hard at the bottom.',
+      'Control the weight back up until your forearms are parallel to the floor.',
+    ],
+    avoid: [
+      'Do not let your elbows drift forward or backward.',
+      'Do not use your body weight to press the cable down.',
     ],
   }
 };
