@@ -7,12 +7,13 @@ import type { SetEntryView, WorkoutExerciseEntryView } from '@/lib/types';
 
 type ExerciseCardProps = {
   exercise: WorkoutExerciseEntryView;
+  nextExerciseCompletedAt?: string | null | Date;
   onSetChange: (exerciseId: string, set: SetEntryView) => void;
   onNotesChange: (exerciseId: string, notes: string) => void;
 };
 
 /** Renders an exercise block with set logging and previous performance. */
-export function ExerciseCard({ exercise, onSetChange, onNotesChange }: ExerciseCardProps): ReactNode {
+export function ExerciseCard({ exercise, nextExerciseCompletedAt, onSetChange, onNotesChange }: ExerciseCardProps): ReactNode {
   const previous = exercise.previousPerformance;
 
   return (
@@ -39,14 +40,16 @@ export function ExerciseCard({ exercise, onSetChange, onNotesChange }: ExerciseC
 
       <div className="space-y-2 pt-2">
         {exercise.sets.map((set, index) => {
-          // Identify the next set to determine when this set's rest period ends
           const nextSet = exercise.sets[index + 1];
+          
+          // If this is the last set of the exercise, use the cross-exercise look-ahead time!
+          const resolvedNextCompletedAt = nextSet?.completedAt || (index === exercise.sets.length - 1 ? nextExerciseCompletedAt : null);
 
           return (
             <SetEntryRow 
               key={set.id} 
               set={set} 
-              nextSetCompletedAt={nextSet?.completedAt} // <-- Automatically locks the rest timer!
+              nextSetCompletedAt={resolvedNextCompletedAt}
               onChange={(nextSet) => onSetChange(exercise.id, nextSet)} 
             />
           );

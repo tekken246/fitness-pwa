@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState, useTransition, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { Timer } from 'lucide-react'; // Added Icon
+import { Timer } from 'lucide-react';
 
 import { completeWorkoutSessionAction, syncWorkoutDraftAction } from '@/lib/actions/workout-actions';
 import { clearWorkoutDraft } from '@/lib/client/workout-draft-store';
@@ -30,11 +30,9 @@ export function ActiveWorkoutLogger({ session }: ActiveWorkoutLoggerProps): Reac
   const [isPending, startTransition] = useTransition();
   const completion = useMemo(() => calculateCompletion(exercises), [exercises]);
 
-  // --- NEW: Main Workout Timer Logic ---
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
-    // Start ticking from the exact moment the session was created in the database
     const startTime = new Date(session.startedAt).getTime();
     const interval = setInterval(() => {
       setElapsedSeconds(Math.floor((Date.now() - startTime) / 1000));
@@ -49,7 +47,6 @@ export function ActiveWorkoutLogger({ session }: ActiveWorkoutLoggerProps): Reac
     if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
-  // ------------------------------------
 
   const handleDraftLoaded = useCallback((draft: WorkoutDraft): void => {
     setSessionNotes(draft.sessionNotes);
@@ -112,7 +109,6 @@ export function ActiveWorkoutLogger({ session }: ActiveWorkoutLoggerProps): Reac
             <h1 className="text-[24px] font-bold tracking-tight mt-0.5">{session.day.muscleGroup}</h1>
           </div>
           <div className="text-right">
-            {/* Live Timer Rendered Here */}
             <div className="flex items-center justify-end gap-1.5 text-[#22C55E] mb-1">
                <Timer className="h-3.5 w-3.5" />
                <span className="text-[13px] font-bold font-mono tracking-wider">{formatWorkoutTime(elapsedSeconds)}</span>
@@ -123,9 +119,28 @@ export function ActiveWorkoutLogger({ session }: ActiveWorkoutLoggerProps): Reac
         {error ? <p className="mt-3 rounded-xl bg-red-500/15 p-3 text-sm font-semibold text-red-400">{error}</p> : null}
       </section>
 
-      {exercises.map((exercise) => (
-        <ExerciseCard exercise={exercise} key={exercise.id} onNotesChange={updateNotes} onSetChange={updateSet} />
-      ))}
+      {exercises.map((exercise, index) => {
+        // Look ahead to subsequent exercises to find the first completed set
+        // This allows the final set of THIS exercise to lock its rest timer!
+        let nextExerciseCompletedAt = null;
+        for (let i = index + 1; i < exercises.length; i++) {
+          const firstCompletedSet = exercises[i].sets.find((s) => s.completed && s.completedAt);
+          if (firstCompletedSet) {
+            nextExerciseCompletedAt = firstCompletedSet.completedAt;
+            break;
+          }
+        }
+
+        return (
+          <ExerciseCard 
+            key={exercise.id} 
+            exercise={exercise} 
+            nextExerciseCompletedAt={nextExerciseCompletedAt}
+            onNotesChange={updateNotes} 
+            onSetChange={updateSet} 
+          />
+        );
+      })}
 
       <label className="block space-y-2 rounded-[20px] border border-white/[0.08] bg-white/[0.03] p-4">
         <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/45">Session notes</span>
