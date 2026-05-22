@@ -119,4 +119,4 @@ export function ExerciseCard({ exercise, nextExerciseCompletedAt, onSetChange, o
       />
     </section>
   );
-}
+} 
