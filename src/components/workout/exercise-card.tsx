@@ -5,7 +5,6 @@ import type { ReactNode } from 'react';
 
 import { SetEntryRow } from '@/components/workout/set-entry-row';
 import type { SetEntryView, WorkoutExerciseEntryView } from '@/lib/types';
-import { OCM_EXERCISE_HELP, OCM_toExerciseSlug } from '@/lib/data/exercise-help';
 import { ExerciseHelpButton, ExerciseHelpSheet } from '@/components/workout/exercise-help-sheet';
 
 type ExerciseCardProps = {
@@ -20,9 +19,9 @@ export function ExerciseCard({ exercise, nextExerciseCompletedAt, onSetChange, o
   const previous = exercise.previousPerformance;
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
-  // Attempt to match exercise against our help database
-  const exerciseSlug = OCM_toExerciseSlug(exercise.displayName);
-  const exerciseHelp = OCM_EXERCISE_HELP[exerciseSlug] || null;
+  // Check if the database provided instructions or images for this exercise
+  const hasHelpData = (exercise.instructions && exercise.instructions.length > 0) || 
+                      (exercise.images && exercise.images.length > 0);
 
   return (
     <section className="space-y-4 rounded-[20px] border border-white/[0.08] bg-white/[0.05] p-5 shadow-sm transition-all hover:border-white/[0.12]">
@@ -30,7 +29,7 @@ export function ExerciseCard({ exercise, nextExerciseCompletedAt, onSetChange, o
         <div>
           <div className="flex items-center gap-2">
             <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/45">Exercise {exercise.position}</p>
-            {exerciseHelp && (
+            {hasHelpData && (
               <ExerciseHelpButton onClick={() => setIsHelpOpen(true)} exerciseName={exercise.displayName} />
             )}
           </div>
@@ -78,9 +77,14 @@ export function ExerciseCard({ exercise, nextExerciseCompletedAt, onSetChange, o
         />
       </label>
 
-      {/* Render Portal Bottom Sheet */}
+      {/* Render Portal Bottom Sheet with dynamic DB properties */}
       <ExerciseHelpSheet 
-        exerciseHelp={exerciseHelp} 
+        exerciseData={{
+          name: exercise.displayName,
+          images: exercise.images,
+          instructions: exercise.instructions,
+          primaryMuscles: exercise.primaryMuscles
+        }}
         isOpen={isHelpOpen} 
         onClose={() => setIsHelpOpen(false)} 
       />

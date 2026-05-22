@@ -192,6 +192,10 @@ export async function getWorkoutSessionView(
       perSide: templateExerciseAssignments.perSide,
       measurementType: exercises.measurementType,
       defaultUnit: exercises.defaultUnit,
+      // --- ADD THESE 3 SELECTS ---
+      images: exercises.images,
+      instructions: exercises.instructions,
+      primaryMuscles: exercises.primaryMuscles,
     })
     .from(workoutExerciseEntries)
     .innerJoin(templateExerciseAssignments, eq(templateExerciseAssignments.id, workoutExerciseEntries.assignmentId))
@@ -259,6 +263,10 @@ export async function getWorkoutSessionView(
     notes: entry.notes,
     previousPerformance: previousPerformance.get(entry.selectedExerciseId) ?? null,
     sets: setsByEntryId.get(entry.id) ?? [],
+    // --- MAP THE NEW DATA ---
+    images: (entry.images as string[]) || [],
+    instructions: (entry.instructions as string[]) || [],
+    primaryMuscles: (entry.primaryMuscles as string[]) || [],
   }));
 
   return {

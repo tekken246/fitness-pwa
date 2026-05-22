@@ -71,6 +71,10 @@ export type WorkoutExerciseEntryView = {
   notes: string;
   previousPerformance: PreviousPerformance | null;
   sets: SetEntryView[];
+  // --- ADD THESE 3 LINES ---
+  images?: string[];
+  instructions?: string[];
+  primaryMuscles?: string[];
 };
 
 export type WorkoutSessionView = {

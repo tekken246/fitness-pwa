@@ -5,18 +5,22 @@ import type { ReactNode } from 'react';
 import { X, Info } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
-import type { ExerciseHelpData } from '@/lib/data/exercise-help';
+type DynamicHelpProps = {
+  name: string;
+  images?: string[];
+  instructions?: string[];
+  primaryMuscles?: string[];
+};
 
 type ExerciseHelpSheetProps = {
-  exerciseHelp: ExerciseHelpData | null;
+  exerciseData: DynamicHelpProps | null;
   isOpen: boolean;
   onClose: () => void;
 };
 
-export function ExerciseHelpSheet({ exerciseHelp, isOpen, onClose }: ExerciseHelpSheetProps): ReactNode {
+export function ExerciseHelpSheet({ exerciseData, isOpen, onClose }: ExerciseHelpSheetProps): ReactNode {
   const [mounted, setMounted] = useState(false);
 
-  // Prevent hydration mismatch by mounting portal only on client
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -32,7 +36,7 @@ export function ExerciseHelpSheet({ exerciseHelp, isOpen, onClose }: ExerciseHel
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen || !exerciseHelp || !mounted) return null;
+  if (!isOpen || !exerciseData || !mounted) return null;
 
   const content = (
     <div 
@@ -41,15 +45,15 @@ export function ExerciseHelpSheet({ exerciseHelp, isOpen, onClose }: ExerciseHel
       onClick={onClose}
     >
       <section
-        className="w-full max-w-md max-h-[78vh] overflow-y-auto rounded-t-[28px] border-t border-white/10 bg-[#0a0e1a] p-5 pb-[calc(24px+env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgba(0,0,0,0.35)] animate-in slide-in-from-bottom-8 duration-300"
+        className="w-full max-w-md max-h-[85vh] overflow-y-auto rounded-t-[28px] border-t border-white/10 bg-[#0a0e1a] p-5 pb-[calc(24px+env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgba(0,0,0,0.35)] animate-in slide-in-from-bottom-8 duration-300"
         role="dialog"
         aria-modal="true"
         aria-labelledby="exercise-help-title"
-        onClick={(e) => e.stopPropagation()} // Prevent clicks inside from closing
+        onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-3 mb-5">
+        <div className="flex items-start justify-between gap-3 mb-5 sticky top-0 bg-[#0a0e1a] pt-1 pb-3 z-10">
           <h2 id="exercise-help-title" className="text-[22px] font-bold tracking-tight text-white leading-tight">
-            {exerciseHelp.name}
+            {exerciseData.name}
           </h2>
           <button
             type="button"
@@ -61,54 +65,46 @@ export function ExerciseHelpSheet({ exerciseHelp, isOpen, onClose }: ExerciseHel
           </button>
         </div>
 
-        {/* Media Wrapper - Light bg as requested since images are b&w */}
-        <div className="flex items-center justify-center rounded-[18px] bg-[#eef0f4] p-4 mb-6">
-          <img
-            src={exerciseHelp.asset}
-            alt={exerciseHelp.assetAlt}
-            className="h-[120px] w-auto object-contain grayscale mix-blend-multiply"
-            loading="lazy"
-            onError={(e) => {
-              // Fallback if image doesn't exist yet
-              (e.currentTarget as HTMLImageElement).style.display = 'none';
-            }}
-          />
-        </div>
+        {/* Dynamic Images from GitHub Cloud Storage */}
+        {exerciseData.images && exerciseData.images.length > 0 && (
+          <div className="flex items-center justify-center gap-2 rounded-[18px] bg-[#eef0f4] p-4 mb-6">
+            {exerciseData.images.slice(0, 2).map((imgUrl, i) => (
+              <img
+                key={i}
+                src={imgUrl}
+                alt={`${exerciseData.name} posture ${i + 1}`}
+                className="h-[120px] w-1/2 object-contain grayscale mix-blend-multiply"
+                loading="lazy"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+              />
+            ))}
+          </div>
+        )}
 
         <div className="space-y-6">
-          <div className="space-y-2">
-            <h3 className="text-[12px] font-bold uppercase tracking-[0.18em] text-[#22C55E]">Setup</h3>
-            <ul className="list-disc pl-5 space-y-1.5 marker:text-white/30">
-              {exerciseHelp.setup.map((item) => (
-                <li key={item} className="text-[14px] text-white/80 leading-relaxed">{item}</li>
-              ))}
-            </ul>
-          </div>
+          {exerciseData.primaryMuscles && exerciseData.primaryMuscles.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-[12px] font-bold uppercase tracking-[0.18em] text-blue-400">Target Muscles</h3>
+              <div className="flex flex-wrap gap-2">
+                {exerciseData.primaryMuscles.map((muscle) => (
+                  <span key={muscle} className="px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[12px] font-semibold capitalize">
+                    {muscle.replace('_', ' ')}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
-          <div className="space-y-2">
-            <h3 className="text-[12px] font-bold uppercase tracking-[0.18em] text-[#22C55E]">Execution</h3>
-            <ul className="list-disc pl-5 space-y-1.5 marker:text-white/30">
-              {exerciseHelp.execution.map((item) => (
-                <li key={item} className="text-[14px] text-white/80 leading-relaxed">{item}</li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="space-y-2">
-            <h3 className="text-[12px] font-bold uppercase tracking-[0.18em] text-blue-400">Targets</h3>
-            <p className="text-[14px] text-white/80 leading-relaxed font-medium">
-              {exerciseHelp.targetMuscles.join(', ')}
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <h3 className="text-[12px] font-bold uppercase tracking-[0.18em] text-red-400">Avoid</h3>
-            <ul className="list-disc pl-5 space-y-1.5 marker:text-red-400/50">
-              {exerciseHelp.avoid.map((item) => (
-                <li key={item} className="text-[14px] text-white/80 leading-relaxed">{item}</li>
-              ))}
-            </ul>
-          </div>
+          {exerciseData.instructions && exerciseData.instructions.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-[12px] font-bold uppercase tracking-[0.18em] text-[#22C55E]">Execution</h3>
+              <ol className="list-decimal pl-5 space-y-2 marker:text-white/30 marker:font-bold">
+                {exerciseData.instructions.map((item, i) => (
+                  <li key={i} className="text-[14px] text-white/80 leading-relaxed pl-1">{item}</li>
+                ))}
+              </ol>
+            </div>
+          )}
         </div>
       </section>
     </div>
