@@ -1,59 +1,64 @@
 'use client';
-
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { SetEntryRow } from '@/components/workout/set-entry-row';
 import type { SetEntryView, WorkoutExerciseEntryView } from '@/lib/types';
-import { OCM_EXERCISE_HELP, OCM_toExerciseSlug } from '@/lib/data/exercise-help';
+import { getExerciseFallback } from '@/lib/data/exercise-help';
 import { ExerciseHelpButton, ExerciseHelpSheet } from '@/components/workout/exercise-help-sheet';
 
-type ExerciseCardProps = {
-  exercise: WorkoutExerciseEntryView;
-  nextExerciseCompletedAt?: string | null | Date;
-  onSetChange: (exerciseId: string, set: SetEntryView) => void;
-  onNotesChange: (exerciseId: string, notes: string) => void;
-};
-
-// Safely handles Postgres returning "{}" or "[]" for empty arrays
-function parseDbArray(data: any): string[] | null {
-  if (!data) return null;
-  if (Array.isArray(data)) {
-    if (data.length === 0 || (data.length === 1 && data[0] === "{}")) return null;
-    return data;
+// Safely parses database string arrays, preventing JSON errors
+function parseDbArray(value: any): string[] | null {
+  if (!value) return null;
+  if (Array.isArray(value)) return value;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
   }
-  if (typeof data === 'string') {
-    if (data === "{}" || data === "[]" || data.trim() === "") return null;
-    try {
-      const parsed = JSON.parse(data);
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
-    } catch {
-      return null;
-    }
-  }
-  return null;
 }
 
-export function ExerciseCard({ exercise, nextExerciseCompletedAt, onSetChange, onNotesChange }: ExerciseCardProps): ReactNode {
+// Ensure you have these props defined if they aren't already
+export interface ExerciseCardProps {
+  exercise: WorkoutExerciseEntryView;
+  nextExerciseCompletedAt?: Date | null;
+  onSetChange?: (setId: string, updates: Partial<SetEntryView>) => void;
+  onNotesChange?: (exerciseId: string, notes: string) => void;
+}
+
+export function ExerciseCard({
+  exercise,
+  nextExerciseCompletedAt,
+  onSetChange,
+  onNotesChange
+}: ExerciseCardProps): ReactNode {
   const previous = exercise.previousPerformance;
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
-  // 1. Clean data coming from the Database
+  // Safely parse data coming from the database
   const dbImages = parseDbArray(exercise.images);
   const dbInstructions = parseDbArray(exercise.instructions);
   const dbMuscles = parseDbArray(exercise.primaryMuscles);
 
-  // 2. Check Fallback Dictionary
-  const slug = OCM_toExerciseSlug(exercise.displayName);
-  const fallback = OCM_EXERCISE_HELP[slug] || null;
+  // Get our smart fallback data using fuzzy matching
+  const fallback = getExerciseFallback(exercise.displayName);
 
-  // 3. Construct the final data object for the Bottom Sheet (Always provide data)
+  // Compile the final data object for the Help Sheet tooltip
   const sheetData = {
     name: exercise.displayName,
-    images: dbImages || fallback?.images || [],
-    instructions: dbInstructions || (fallback ? [...fallback.setup, ...fallback.execution] : ['Specific visual instructions for this custom exercise variation are currently unavailable.']),
-    primaryMuscles: dbMuscles || fallback?.targetMuscles || []
+    // Prefer database images, fall back to smart dictionary, default to empty array
+    images: dbImages && dbImages.length > 0 ? dbImages : (fallback?.images || []),
+
+    // Prefer database instructions, fall back to smart dictionary, default to generic text
+    instructions: dbInstructions && dbInstructions.length > 0
+      ? dbInstructions
+      : (fallback ? [...fallback.setup, ...fallback.execution] : ['Specific visual instructions for this custom exercise variation are currently unavailable.']),
+
+    // Prefer database muscles, fall back to smart dictionary, default to empty array
+    primaryMuscles: dbMuscles && dbMuscles.length > 0 ? dbMuscles : (fallback?.targetMuscles || [])
   };
+
 
   return (
     <section className="space-y-4 rounded-[20px] border border-white/[0.08] bg-white/[0.05] p-5 shadow-sm transition-all hover:border-white/[0.12]">
@@ -87,11 +92,11 @@ export function ExerciseCard({ exercise, nextExerciseCompletedAt, onSetChange, o
           const resolvedNextCompletedAt = nextSet?.completedAt || (index === exercise.sets.length - 1 ? nextExerciseCompletedAt : null);
 
           return (
-            <SetEntryRow 
-              key={set.id} 
-              set={set} 
+            <SetEntryRow
+              key={set.id}
+              set={set}
               nextSetCompletedAt={resolvedNextCompletedAt}
-              onChange={(nextSet) => onSetChange(exercise.id, nextSet)} 
+              onChange={(nextSet) => onSetChange(exercise.id, nextSet)}
             />
           );
         })}
@@ -108,10 +113,10 @@ export function ExerciseCard({ exercise, nextExerciseCompletedAt, onSetChange, o
         />
       </label>
 
-      <ExerciseHelpSheet 
+      <ExerciseHelpSheet
         exerciseData={sheetData}
-        isOpen={isHelpOpen} 
-        onClose={() => setIsHelpOpen(false)} 
+        isOpen={isHelpOpen}
+        onClose={() => setIsHelpOpen(false)}
       />
     </section>
   );
