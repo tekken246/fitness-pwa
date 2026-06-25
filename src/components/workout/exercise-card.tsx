@@ -1,4 +1,5 @@
 'use client';
+
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 
@@ -19,12 +20,12 @@ function parseDbArray(value: any): string[] | null {
   }
 }
 
-// Ensure you have these props defined if they aren't already
 export interface ExerciseCardProps {
   exercise: WorkoutExerciseEntryView;
-  nextExerciseCompletedAt?: Date | null;
-  onSetChange?: (setId: string, updates: Partial<SetEntryView>) => void;
-  onNotesChange?: (exerciseId: string, notes: string) => void;
+  // ACCEPT STRING: Fixes the Vercel build error
+  nextExerciseCompletedAt?: string | Date | null; 
+  onSetChange: (exerciseId: string, set: SetEntryView) => void;
+  onNotesChange: (exerciseId: string, notes: string) => void;
 }
 
 export function ExerciseCard({
@@ -58,7 +59,6 @@ export function ExerciseCard({
     // Prefer database muscles, fall back to smart dictionary, default to empty array
     primaryMuscles: dbMuscles && dbMuscles.length > 0 ? dbMuscles : (fallback?.targetMuscles || [])
   };
-
 
   return (
     <section className="space-y-4 rounded-[20px] border border-white/[0.08] bg-white/[0.05] p-5 shadow-sm transition-all hover:border-white/[0.12]">
