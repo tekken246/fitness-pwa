@@ -20,7 +20,22 @@ export const setEntryUpdateSchema = z.object({
   weight: z.number().min(0).max(2000).nullable(),
   reps: z.number().int().min(0).max(1000).nullable(),
   rpe: z.number().min(0).max(10).nullable(),
+  // Defaulted so older offline drafts (persisted before this field existed) still sync.
+  kind: z.enum(['working', 'warmup']).default('working'),
   completed: z.boolean(),
+});
+
+export const swapExerciseSchema = z.object({
+  exerciseEntryId: z.string().min(1),
+  exerciseId: z.string().min(1),
+});
+
+export const addSetSchema = z.object({
+  exerciseEntryId: z.string().min(1),
+});
+
+export const removeSetSchema = z.object({
+  setEntryId: z.string().min(1),
 });
 
 export const exerciseNotesSchema = z.object({
@@ -40,7 +55,9 @@ export const completeSessionSchema = z.object({
 export const syncWorkoutDraftSchema = z.object({
   sessionId: z.string().min(1),
   sessionNotes: z.string().max(4000),
-  exerciseNotes: z.record(z.string().min(1), z.string().max(2000)),
+  exerciseNotes: z
+    .record(z.string().min(1), z.string().max(2000))
+    .refine((value) => Object.keys(value).length <= 100, 'Too many exercise notes.'),
   sets: z.array(setEntryUpdateSchema).max(100),
 });
 

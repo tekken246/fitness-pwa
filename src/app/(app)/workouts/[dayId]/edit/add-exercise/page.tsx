@@ -6,6 +6,8 @@ import type { ReactNode } from 'react';
 
 import { db } from '@/db/client';
 import { workoutTemplateDays, exercises } from '@/db/schema';
+import { requireClerkUserId } from '@/lib/auth';
+import { assertEditableTemplateDay } from '@/lib/data/routine-access';
 import { ExerciseSearchList } from './exercise-search-list';
 
 interface PageProps {
@@ -14,6 +16,9 @@ interface PageProps {
 
 export default async function AddExercisePage({ params }: PageProps): Promise<ReactNode> {
   const { dayId } = await params;
+  const clerkUserId = await requireClerkUserId();
+  // Only the owner of this routine may add exercises to it.
+  await assertEditableTemplateDay(dayId, clerkUserId);
 
   // Verify the routine exists
   const [routine] = await db

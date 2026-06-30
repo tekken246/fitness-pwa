@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Card } from '@/components/ui/card';
 import { startWorkoutForDayAction } from '@/lib/actions/workout-actions';
 import { getTemplateDayDetail } from '@/lib/data/workout-templates';
+import { requireClerkUserId } from '@/lib/auth';
 
 type WorkoutDayPageProps = {
   params: Promise<{ dayId: string }>;
@@ -11,7 +12,8 @@ type WorkoutDayPageProps = {
 /** Renders details for one seeded workout day. */
 export default async function WorkoutDayPage({ params }: WorkoutDayPageProps): Promise<ReactNode> {
   const { dayId } = await params;
-  const detail = await getTemplateDayDetail(dayId);
+  const clerkUserId = await requireClerkUserId();
+  const detail = await getTemplateDayDetail(dayId, clerkUserId);
 
   return (
     <div className="space-y-4">

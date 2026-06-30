@@ -3,8 +3,9 @@ import type { ReactNode } from 'react';
 import { Plus, Dumbbell, CalendarDays, ChevronRight, Play, Moon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { startWorkoutForDayAction } from '@/lib/actions/workout-actions';
-import { getWeeklyPlan } from '@/lib/data/workout-templates';
+import { getRoutinesForUser, getSeedWeeklyPlan } from '@/lib/data/workout-templates';
 import { createFlexibleRoutineAction } from '@/lib/actions/routine-actions';
+import { requireClerkUserId } from '@/lib/auth';
 
 interface PageProps {
   searchParams: Promise<{ tab?: string }>;
@@ -12,10 +13,13 @@ interface PageProps {
 
 export default async function WorkoutsPage({ searchParams }: PageProps): Promise<ReactNode> {
   const { tab = 'routines' } = await searchParams;
-  const plan = await getWeeklyPlan();
+  const clerkUserId = await requireClerkUserId();
 
-  const scheduledDays = plan.filter((day) => day.dayOfWeek !== null);
-  const floatingRoutines = plan.filter((day) => day.dayOfWeek === null);
+  // Seed plan is shared and read-only; "My Routines" are private to this user.
+  const [scheduledDays, floatingRoutines] = await Promise.all([
+    getSeedWeeklyPlan(),
+    getRoutinesForUser(clerkUserId),
+  ]);
 
   const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 

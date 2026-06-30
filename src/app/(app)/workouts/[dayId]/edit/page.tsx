@@ -8,6 +8,8 @@ import { workoutTemplateDays, templateExerciseAssignments, exercises } from '@/d
 import { Card } from '@/components/ui/card';
 import { removeExerciseFromRoutineAction } from '@/lib/actions/builder-actions';
 import { deleteFlexibleRoutineAction } from '@/lib/actions/routine-actions';
+import { requireClerkUserId } from '@/lib/auth';
+import { assertEditableTemplateDay } from '@/lib/data/routine-access';
 
 interface PageProps {
   params: Promise<{ dayId: string }>;
@@ -15,6 +17,9 @@ interface PageProps {
 
 export default async function RoutineEditorPage({ params }: PageProps) {
   const { dayId } = await params;
+  const clerkUserId = await requireClerkUserId();
+  // Only the owner of this routine may open the editor (seed plan is read-only).
+  await assertEditableTemplateDay(dayId, clerkUserId);
 
   const [routine] = await db
     .select()

@@ -2,6 +2,7 @@ export type UnitPreference = 'lb' | 'kg';
 export type ThemePreference = 'light' | 'dark' | 'rose';
 export type SessionStatus = 'active' | 'completed';
 export type TrendDirection = 'stronger' | 'weaker' | 'neutral';
+export type SetKind = 'working' | 'warmup';
 
 export type UserSettings = {
   clerkUserId: string;
@@ -46,6 +47,7 @@ export type SetEntryView = {
   reps: number | null;
   unit: UnitPreference | 'none';
   rpe: number | null;
+  kind: SetKind;
   completed: boolean;
   completedAt?: string | null; // <--- ADDED THIS TO FIX THE BUILD ERROR
 };
@@ -77,6 +79,18 @@ export type WorkoutExerciseEntryView = {
   primaryMuscles?: string[];
 };
 
+export type ExerciseCatalogItem = {
+  id: string;
+  name: string;
+  category: string;
+  equipment: string;
+  measurementType: string;
+  defaultUnit: UnitPreference | 'none';
+  primaryMuscles: string[];
+  images: string[];
+  instructions: string[];
+};
+
 export type WorkoutSessionView = {
   id: string;
   localDate: string;
@@ -99,6 +113,7 @@ export type SetDraft = {
   weight: number | null;
   reps: number | null;
   rpe: number | null;
+  kind: SetKind;
   completed: boolean;
 };
 

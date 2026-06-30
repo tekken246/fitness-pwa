@@ -16,6 +16,7 @@ export function buildWorkoutDraft(
         weight: set.weight,
         reps: set.reps,
         rpe: set.rpe,
+        kind: set.kind,
         completed: set.completed,
       })),
     ),

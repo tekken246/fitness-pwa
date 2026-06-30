@@ -47,6 +47,15 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 }
 
 
+// Validate ../../src/app/(app)/exercises/[exerciseId]/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/exercises/[exerciseId]">> = Specific
+  const handler = {} as typeof import("../../src/app/(app)/exercises/[exerciseId]/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
 // Validate ../../src/app/(app)/history/[exerciseId]/page.tsx
 {
   type __IsExpected<Specific extends AppPageConfig<"/history/[exerciseId]">> = Specific
@@ -96,6 +105,24 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 {
   type __IsExpected<Specific extends AppPageConfig<"/today">> = Specific
   const handler = {} as typeof import("../../src/app/(app)/today/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../src/app/(app)/workouts/[dayId]/edit/add-exercise/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/workouts/[dayId]/edit/add-exercise">> = Specific
+  const handler = {} as typeof import("../../src/app/(app)/workouts/[dayId]/edit/add-exercise/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../src/app/(app)/workouts/[dayId]/edit/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/workouts/[dayId]/edit">> = Specific
+  const handler = {} as typeof import("../../src/app/(app)/workouts/[dayId]/edit/page.js")
   type __Check = __IsExpected<typeof handler>
   // @ts-ignore
   type __Unused = __Check

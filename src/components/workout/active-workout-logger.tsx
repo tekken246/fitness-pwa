@@ -3,17 +3,25 @@
 import { useCallback, useMemo, useState, useTransition, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { Timer } from 'lucide-react';
+import { Timer, Minus, Plus } from 'lucide-react';
 
-import { completeWorkoutSessionAction, syncWorkoutDraftAction } from '@/lib/actions/workout-actions';
+import {
+  addSetAction,
+  completeWorkoutSessionAction,
+  removeSetAction,
+  swapExerciseAction,
+  syncWorkoutDraftAction,
+} from '@/lib/actions/workout-actions';
 import { clearWorkoutDraft } from '@/lib/client/workout-draft-store';
-import type { SetEntryView, WorkoutDraft, WorkoutExerciseEntryView, WorkoutSessionView } from '@/lib/types';
+import type { ExerciseCatalogItem, SetEntryView, WorkoutDraft, WorkoutExerciseEntryView, WorkoutSessionView } from '@/lib/types';
 import { ExerciseCard } from '@/components/workout/exercise-card';
 import { buildWorkoutDraft, mergeWorkoutDraft } from '@/components/workout/workout-draft-state';
 import { useWorkoutDraftSync } from '@/components/workout/use-workout-draft-sync';
+import { useRestSeconds } from '@/components/workout/use-workout-prefs';
 
 type ActiveWorkoutLoggerProps = {
   session: WorkoutSessionView;
+  catalog: ExerciseCatalogItem[];
 };
 
 function calculateCompletion(exercises: WorkoutExerciseEntryView[]): number {
@@ -22,12 +30,21 @@ function calculateCompletion(exercises: WorkoutExerciseEntryView[]): number {
   return allSets.length === 0 ? 0 : Math.round((doneSets / allSets.length) * 100);
 }
 
-export function ActiveWorkoutLogger({ session }: ActiveWorkoutLoggerProps): ReactNode {
+function formatClock(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
+export function ActiveWorkoutLogger({ session, catalog }: ActiveWorkoutLoggerProps): ReactNode {
   const router = useRouter();
   const [exercises, setExercises] = useState(session.exercises);
   const [sessionNotes, setSessionNotes] = useState(session.notes);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [restSeconds, setRestSeconds] = useRestSeconds();
   const completion = useMemo(() => calculateCompletion(exercises), [exercises]);
 
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -39,14 +56,6 @@ export function ActiveWorkoutLogger({ session }: ActiveWorkoutLoggerProps): Reac
     }, 1000);
     return () => clearInterval(interval);
   }, [session.startedAt]);
-
-  const formatWorkoutTime = (totalSeconds: number) => {
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60);
-    const s = totalSeconds % 60;
-    if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
 
   const handleDraftLoaded = useCallback((draft: WorkoutDraft): void => {
     setSessionNotes(draft.sessionNotes);
@@ -75,6 +84,71 @@ export function ActiveWorkoutLogger({ session }: ActiveWorkoutLoggerProps): Reac
     setExercises((current) =>
       current.map((exercise) => (exercise.id === exerciseEntryId ? { ...exercise, notes } : exercise)),
     );
+  };
+
+  const swapExercise = (exerciseEntryId: string, exerciseId: string): void => {
+    startTransition(() => {
+      swapExerciseAction({ exerciseEntryId, exerciseId }).then((result) => {
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        setError(null);
+        setExercises((current) =>
+          current.map((exercise) =>
+            exercise.id === exerciseEntryId
+              ? {
+                  ...exercise,
+                  selectedExerciseId: result.data.selectedExerciseId,
+                  displayName: result.data.displayName,
+                  measurementType: result.data.measurementType,
+                  defaultUnit: result.data.defaultUnit,
+                  images: result.data.images,
+                  instructions: result.data.instructions,
+                  primaryMuscles: result.data.primaryMuscles,
+                  previousPerformance: null,
+                }
+              : exercise,
+          ),
+        );
+      });
+    });
+  };
+
+  const addSet = (exerciseEntryId: string): void => {
+    startTransition(() => {
+      addSetAction({ exerciseEntryId }).then((result) => {
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        setError(null);
+        setExercises((current) =>
+          current.map((exercise) =>
+            exercise.id === exerciseEntryId ? { ...exercise, sets: [...exercise.sets, result.data] } : exercise,
+          ),
+        );
+      });
+    });
+  };
+
+  const removeSet = (exerciseEntryId: string, setId: string): void => {
+    startTransition(() => {
+      removeSetAction({ setEntryId: setId }).then((result) => {
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        setError(null);
+        setExercises((current) =>
+          current.map((exercise) =>
+            exercise.id === exerciseEntryId
+              ? { ...exercise, sets: exercise.sets.filter((set) => set.id !== setId) }
+              : exercise,
+          ),
+        );
+      });
+    });
   };
 
   const completeWorkout = (): void => {
@@ -106,23 +180,35 @@ export function ActiveWorkoutLogger({ session }: ActiveWorkoutLoggerProps): Reac
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/45">{session.localDate}</p>
-            <h1 className="text-[24px] font-bold tracking-tight mt-0.5">{session.day.muscleGroup}</h1>
+            <h1 className="mt-0.5 text-[24px] font-bold tracking-tight">{session.day.muscleGroup}</h1>
           </div>
           <div className="text-right">
-            <div className="flex items-center justify-end gap-1.5 text-[#22C55E] mb-1">
-               <Timer className="h-3.5 w-3.5" />
-               <span className="text-[13px] font-bold font-mono tracking-wider">{formatWorkoutTime(elapsedSeconds)}</span>
+            <div className="mb-1 flex items-center justify-end gap-1.5 text-[#22C55E]">
+              <Timer className="h-3.5 w-3.5" />
+              <span className="font-mono text-[13px] font-bold tracking-wider">{formatClock(elapsedSeconds)}</span>
             </div>
             <div className="text-[20px] font-bold leading-none">{completion}%</div>
           </div>
         </div>
+
+        <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-3">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-white/40">Rest timer</span>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setRestSeconds(restSeconds - 15)} aria-label="Decrease rest" className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-white/[0.06] text-white/70 hover:text-white">
+              <Minus className="h-3.5 w-3.5" />
+            </button>
+            <span className="w-12 text-center font-mono text-[13px] font-bold text-white">{formatClock(restSeconds)}</span>
+            <button type="button" onClick={() => setRestSeconds(restSeconds + 15)} aria-label="Increase rest" className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-white/[0.06] text-white/70 hover:text-white">
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+
         {error ? <p className="mt-3 rounded-xl bg-red-500/15 p-3 text-sm font-semibold text-red-400">{error}</p> : null}
       </section>
 
       {exercises.map((exercise, index) => {
-        // Look ahead to subsequent exercises to find the first completed set
-        // This allows the final set of THIS exercise to lock its rest timer!
-        let nextExerciseCompletedAt = null;
+        let nextExerciseCompletedAt: string | null | undefined = null;
         for (let i = index + 1; i < exercises.length; i++) {
           const firstCompletedSet = exercises[i].sets.find((s) => s.completed && s.completedAt);
           if (firstCompletedSet) {
@@ -132,12 +218,18 @@ export function ActiveWorkoutLogger({ session }: ActiveWorkoutLoggerProps): Reac
         }
 
         return (
-          <ExerciseCard 
-            key={exercise.id} 
-            exercise={exercise} 
+          <ExerciseCard
+            key={exercise.id}
+            exercise={exercise}
+            restSeconds={restSeconds}
+            catalog={catalog}
+            pending={isPending}
             nextExerciseCompletedAt={nextExerciseCompletedAt}
-            onNotesChange={updateNotes} 
-            onSetChange={updateSet} 
+            onNotesChange={updateNotes}
+            onSetChange={updateSet}
+            onSwap={swapExercise}
+            onAddSet={addSet}
+            onRemoveSet={removeSet}
           />
         );
       })}

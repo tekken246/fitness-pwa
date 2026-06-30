@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, ne } from 'drizzle-orm';
 
 import { db } from '@/db/client';
 import { exercises, setEntries, workoutExerciseEntries, workoutSessions } from '@/db/schema';
@@ -50,6 +50,7 @@ export async function getProgressSummariesForUser(clerkUserId: string): Promise<
         eq(workoutSessions.clerkUserId, clerkUserId),
         eq(workoutSessions.status, 'completed'),
         eq(setEntries.completed, true),
+        ne(setEntries.kind, 'warmup'),
       ),
     )
     .orderBy(asc(workoutSessions.localDate), asc(setEntries.position));
@@ -81,6 +82,7 @@ export async function getExerciseProgressForUser(
         eq(workoutExerciseEntries.selectedExerciseId, exerciseId),
         eq(workoutSessions.status, 'completed'),
         eq(setEntries.completed, true),
+        ne(setEntries.kind, 'warmup'),
       ),
     )
     .orderBy(asc(workoutSessions.localDate), asc(setEntries.position));

@@ -15,9 +15,9 @@ export function toErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  if (error instanceof Error) {
-    return error.message;
-  }
+  // Never surface internal error details (DB/driver messages, stack traces) to the UI.
+  // Log the real error server-side and return a generic, safe message.
+  console.error('[unhandled action error]', error);
 
-  return 'Unexpected error.';
+  return 'Something went wrong. Please try again.';
 }

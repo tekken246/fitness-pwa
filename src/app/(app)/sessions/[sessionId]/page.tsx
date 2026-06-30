@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 import { ActiveWorkoutLogger } from '@/components/workout/active-workout-logger';
 import { requireClerkUserId } from '@/lib/auth';
-import { getWorkoutSessionView } from '@/lib/data/workout-sessions';
+import { getExerciseCatalog, getWorkoutSessionView } from '@/lib/data/workout-sessions';
 
 type SessionPageProps = {
   params: Promise<{ sessionId: string }>;
@@ -12,7 +12,10 @@ type SessionPageProps = {
 export default async function SessionPage({ params }: SessionPageProps): Promise<ReactNode> {
   const { sessionId } = await params;
   const clerkUserId = await requireClerkUserId();
-  const session = await getWorkoutSessionView(clerkUserId, sessionId);
+  const [session, catalog] = await Promise.all([
+    getWorkoutSessionView(clerkUserId, sessionId),
+    getExerciseCatalog(),
+  ]);
 
-  return <ActiveWorkoutLogger session={session} />;
+  return <ActiveWorkoutLogger session={session} catalog={catalog} />;
 }

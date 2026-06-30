@@ -6,7 +6,8 @@ import { Card } from '@/components/ui/card';
 import { startTodayWorkoutAction, startWorkoutForDayAction } from '@/lib/actions/workout-actions';
 import { requireClerkUserId } from '@/lib/auth';
 import { getOrCreateUserSettings } from '@/lib/data/settings';
-import { getTemplateDayByIsoWeekday, getWeeklyPlan } from '@/lib/data/workout-templates';
+import { getRoutinesForUser, getTemplateDayByIsoWeekday } from '@/lib/data/workout-templates';
+import { getAverageWorkoutMinutes } from '@/lib/data/workout-sessions';
 import { getRecentWorkoutSessions, getSessionForDayOnDate } from '@/lib/data/workout-sessions';
 import { getIsoWeekdayForTimezone, getLocalDateForTimezone } from '@/lib/timezone';
 
@@ -23,10 +24,10 @@ export default async function TodayPage(): Promise<ReactNode> {
   const day = await getTemplateDayByIsoWeekday(dayOfWeek);
   const existingSession = await getSessionForDayOnDate(clerkUserId, day.id, localDate);
   const recentSessions = await getRecentWorkoutSessions(clerkUserId);
-  const plan = await getWeeklyPlan();
-  
-  // Isolate custom routines for the Quick Start row
-  const customRoutines = plan.filter((d) => d.dayOfWeek === null);
+
+  // Quick Start shows the user's own routines (private to them).
+  const customRoutines = await getRoutinesForUser(clerkUserId);
+  const avgWorkoutMinutes = await getAverageWorkoutMinutes(clerkUserId);
 
   // Date Formatting for Header
   const dayName = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: settings.timezone }).format(now);
@@ -73,7 +74,7 @@ export default async function TodayPage(): Promise<ReactNode> {
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#22C55E]">Today's Workout</p>
           <h2 className="mt-1 text-[20px] font-semibold text-white tracking-tight">{day.muscleGroup}</h2>
           <p className="text-[15px] font-normal text-white/70 mt-0.5">
-            {day.exercises.length > 0 ? `${day.exercises.length} exercises · ~45 min` : 'Recovery day'}
+            {day.exercises.length > 0 ? `${day.exercises.length} exercises · ~${avgWorkoutMinutes ?? Math.max(20, day.exercises.length * 8)} min` : 'Recovery day'}
           </p>
         </div>
 

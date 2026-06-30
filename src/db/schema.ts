@@ -33,10 +33,14 @@ export const workoutTemplates = pgTable(
     version: integer('version').notNull(),
     source: text('source').notNull(),
     isSeed: boolean('is_seed').notNull().default(false),
+    // Owner of a user-created routine. NULL is reserved for the shared seed plan
+    // (identified by is_seed = true). Ownership is enforced in the data layer.
+    ownerClerkUserId: text('owner_clerk_user_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
     nameVersion: uniqueIndex('uq_workout_templates_name_version').on(table.name, table.version),
+    owner: index('idx_workout_templates_owner').on(table.ownerClerkUserId),
   }),
 );
 
@@ -179,6 +183,9 @@ export const setEntries = pgTable(
     reps: integer('reps'),
     unit: text('unit').notNull().default('lb'),
     rpe: doublePrecision('rpe'),
+    // 'working' (counts toward volume/PRs) or 'warmup' (excluded). Defaults keep all
+    // historical rows as working sets, so existing analytics are unchanged.
+    kind: text('kind').notNull().default('working'),
     completed: boolean('completed').notNull().default(false),
     completedAt: timestamp('completed_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

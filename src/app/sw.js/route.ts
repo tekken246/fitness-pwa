@@ -1,5 +1,9 @@
+// Per-deploy cache key so stale shells/icons are invalidated on each release.
+const BUILD_ID =
+  process.env.NEXT_PUBLIC_BUILD_ID ?? process.env.VERCEL_GIT_COMMIT_SHA ?? 'dev';
+
 const serviceWorkerSource = `
-const CACHE_NAME = 'fit-track-shell-v1';
+const CACHE_NAME = 'fit-track-shell-${BUILD_ID}';
 const SHELL_ASSETS = ['/offline', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -20,7 +24,15 @@ self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
 
-  if (request.method !== 'GET' || url.pathname.startsWith('/api') || url.pathname.startsWith('/_next/data')) {
+  // Only same-origin GET. Never touch API, RSC, or data requests so authenticated,
+  // user-specific payloads are never served from a shared cache.
+  if (
+    request.method !== 'GET' ||
+    url.origin !== self.location.origin ||
+    url.pathname.startsWith('/api') ||
+    url.pathname.startsWith('/_next/data') ||
+    url.searchParams.has('_rsc')
+  ) {
     return;
   }
 
@@ -29,6 +41,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Cache only static, non-sensitive icon assets.
   if (url.pathname.startsWith('/icons/')) {
     event.respondWith(caches.match(request).then((cached) => cached || fetch(request)));
   }

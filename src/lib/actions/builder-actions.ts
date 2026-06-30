@@ -1,40 +1,45 @@
 'use server';
 
-import { eq, max } from 'drizzle-orm';
+import { and, eq, max } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
+
 import { db } from '@/db/client';
 import { exercises, templateExerciseAssignments } from '@/db/schema';
 import { requireClerkUserId } from '@/lib/auth';
+import { assertEditableTemplateDay } from '@/lib/data/routine-access';
+import { enforceRateLimit } from '@/lib/rate-limit';
 
 export async function addExerciseToRoutineAction(formData: FormData) {
-  await requireClerkUserId(); // Ensure authentication
-  
-  const dayId = formData.get('dayId') as string;
-  const exerciseId = formData.get('exerciseId') as string;
+  const clerkUserId = await requireClerkUserId();
+  await enforceRateLimit(clerkUserId, 'routine-write');
+
+  const dayId = formData.get('dayId') as string | null;
+  const exerciseId = formData.get('exerciseId') as string | null;
 
   if (!dayId || !exerciseId) throw new Error('Missing required fields');
 
-  // Fetch the exercise to use its name as the default displayName
+  // Authorise: only the owner of this (non-seed) routine may modify it.
+  await assertEditableTemplateDay(dayId, clerkUserId);
+
+  // The exercise catalogue is intentionally global/shared.
   const [exercise] = await db.select().from(exercises).where(eq(exercises.id, exerciseId));
   if (!exercise) throw new Error('Exercise not found');
 
-  // Calculate the next position at the bottom of the list
   const [result] = await db
     .select({ maxPosition: max(templateExerciseAssignments.position) })
     .from(templateExerciseAssignments)
     .where(eq(templateExerciseAssignments.dayId, dayId));
-  
+
   const nextPosition = (result?.maxPosition ?? -1) + 1;
 
-  // Insert the new exercise assignment
   await db.insert(templateExerciseAssignments).values({
     id: `assign_${crypto.randomUUID()}`,
-    dayId: dayId,
-    exerciseId: exerciseId,
+    dayId,
+    exerciseId,
     displayName: exercise.name,
     position: nextPosition,
-    sets: 3, // Default to 3 sets
-    targetReps: [10, 10, 10], // Default hypertrophy rep range
+    sets: 3,
+    targetReps: [10, 10, 10],
     targetType: 'weight_reps',
     isOptional: false,
     perSide: false,
@@ -44,13 +49,21 @@ export async function addExerciseToRoutineAction(formData: FormData) {
 }
 
 export async function removeExerciseFromRoutineAction(formData: FormData) {
-  await requireClerkUserId();
-  const assignmentId = formData.get('assignmentId') as string;
-  const dayId = formData.get('dayId') as string;
+  const clerkUserId = await requireClerkUserId();
+  await enforceRateLimit(clerkUserId, 'routine-write');
 
-  if (!assignmentId) throw new Error('Missing assignment ID');
+  const assignmentId = formData.get('assignmentId') as string | null;
+  const dayId = formData.get('dayId') as string | null;
 
-  await db.delete(templateExerciseAssignments).where(eq(templateExerciseAssignments.id, assignmentId));
-  
+  if (!assignmentId || !dayId) throw new Error('Missing assignment id');
+
+  // Authorise the parent routine, then constrain the delete to that day so a mismatched
+  // dayId cannot remove an assignment from a routine the user does not own.
+  await assertEditableTemplateDay(dayId, clerkUserId);
+
+  await db
+    .delete(templateExerciseAssignments)
+    .where(and(eq(templateExerciseAssignments.id, assignmentId), eq(templateExerciseAssignments.dayId, dayId)));
+
   revalidatePath(`/workouts/${dayId}/edit`);
 }

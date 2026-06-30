@@ -1,15 +1,15 @@
 import 'server-only';
 
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq, type SQL } from 'drizzle-orm';
 
 import { db } from '@/db/client';
-import { exercises, templateExerciseAssignments, workoutTemplateDays } from '@/db/schema';
+import { exercises, templateExerciseAssignments, workoutTemplateDays, workoutTemplates } from '@/db/schema';
 import { AppError } from '@/lib/errors';
 import type { TemplateExercise, WorkoutDaySummary } from '@/lib/types';
-import { SEED_TEMPLATE_ID } from '@/lib/workouts/seed-plan';
+import { getUsableTemplateDay } from '@/lib/data/routine-access';
 
-/** Returns the seeded weekly workout plan with exercise names grouped by day. */
-export async function getWeeklyPlan(): Promise<WorkoutDaySummary[]> {
+/** Shared loader: day summaries (with exercise names) for a template-scope filter. */
+async function loadDaySummaries(where: SQL | undefined): Promise<WorkoutDaySummary[]> {
   const rows = await db
     .select({
       dayId: workoutTemplateDays.id,
@@ -23,8 +23,9 @@ export async function getWeeklyPlan(): Promise<WorkoutDaySummary[]> {
       exercisePosition: templateExerciseAssignments.position,
     })
     .from(workoutTemplateDays)
+    .innerJoin(workoutTemplates, eq(workoutTemplates.id, workoutTemplateDays.templateId))
     .leftJoin(templateExerciseAssignments, eq(templateExerciseAssignments.dayId, workoutTemplateDays.id))
-    // .where(eq(workoutTemplateDays.templateId, SEED_TEMPLATE_ID))
+    .where(where)
     .orderBy(asc(workoutTemplateDays.displayOrder), asc(templateExerciseAssignments.position));
 
   const dayMap = new Map<string, WorkoutDaySummary>();
@@ -54,9 +55,21 @@ export async function getWeeklyPlan(): Promise<WorkoutDaySummary[]> {
   return Array.from(dayMap.values()).sort((left, right) => left.displayOrder - right.displayOrder);
 }
 
+/** Returns the shared, read-only seed weekly plan (Monday-Sunday). */
+export async function getSeedWeeklyPlan(): Promise<WorkoutDaySummary[]> {
+  return loadDaySummaries(eq(workoutTemplates.isSeed, true));
+}
+
+/** Returns routines owned by the authenticated user (never the seed, never other users'). */
+export async function getRoutinesForUser(clerkUserId: string): Promise<WorkoutDaySummary[]> {
+  return loadDaySummaries(
+    and(eq(workoutTemplates.ownerClerkUserId, clerkUserId), eq(workoutTemplates.isSeed, false)),
+  );
+}
+
 /** Returns the seeded template day for a local ISO weekday. */
 export async function getTemplateDayByIsoWeekday(dayOfWeek: number): Promise<WorkoutDaySummary> {
-  const plan = await getWeeklyPlan();
+  const plan = await getSeedWeeklyPlan();
   const day = plan.find((item) => item.dayOfWeek === dayOfWeek);
 
   if (!day) {
@@ -66,13 +79,15 @@ export async function getTemplateDayByIsoWeekday(dayOfWeek: number): Promise<Wor
   return day;
 }
 
-/** Returns the seeded template day and exercise assignments by day ID. */
-export async function getTemplateDayDetail(dayId: string): Promise<{
-  day: WorkoutDaySummary;
-  exercises: TemplateExercise[];
-}> {
-  const plan = await getWeeklyPlan();
-  const day = plan.find((item) => item.id === dayId);
+/** Returns a template day and its assignments, only if the user may view it (seed or owned). */
+export async function getTemplateDayDetail(
+  dayId: string,
+  clerkUserId: string,
+): Promise<{ day: WorkoutDaySummary; exercises: TemplateExercise[] }> {
+  // Authorise first: shared seed, or a routine owned by this user.
+  await getUsableTemplateDay(dayId, clerkUserId);
+
+  const [day] = await loadDaySummaries(eq(workoutTemplateDays.id, dayId));
 
   if (!day) {
     throw new AppError('not_found', 'Workout day was not found.');
@@ -84,7 +99,7 @@ export async function getTemplateDayDetail(dayId: string): Promise<{
   };
 }
 
-/** Returns exercise assignments for a seeded template day. */
+/** Returns exercise assignments for a template day. Callers MUST authorise the day first. */
 export async function getTemplateExercisesForDay(dayId: string): Promise<TemplateExercise[]> {
   const rows = await db
     .select({

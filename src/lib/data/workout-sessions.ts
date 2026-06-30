@@ -14,9 +14,11 @@ import {
 import { AppError } from '@/lib/errors';
 import { assertUserScopedRecord } from '@/lib/security';
 import type {
+  ExerciseCatalogItem,
   PreviousPerformance,
   SetDraft,
   SetEntryView,
+  SetKind,
   TemplateExercise,
   UnitPreference,
   WorkoutExerciseEntryView,
@@ -192,6 +194,7 @@ export async function getWorkoutSessionView(
       perSide: templateExerciseAssignments.perSide,
       measurementType: exercises.measurementType,
       defaultUnit: exercises.defaultUnit,
+      selectedExerciseName: exercises.name,
       // --- ADD THESE 3 SELECTS ---
       images: exercises.images,
       instructions: exercises.instructions,
@@ -216,6 +219,7 @@ export async function getWorkoutSessionView(
           reps: setEntries.reps,
           unit: setEntries.unit,
           rpe: setEntries.rpe,
+          kind: setEntries.kind,
           completed: setEntries.completed,
           completedAt: setEntries.completedAt, // Needed for internal timers
         })
@@ -243,6 +247,7 @@ export async function getWorkoutSessionView(
       reps: row.reps,
       unit: row.unit as UnitPreference | 'none',
       rpe: row.rpe,
+      kind: row.kind as SetKind,
       completed: row.completed,
       completedAt: row.completedAt, // Needed for internal timers
     } as any);
@@ -254,7 +259,8 @@ export async function getWorkoutSessionView(
     assignmentId: entry.assignmentId,
     exerciseId: entry.exerciseId,
     selectedExerciseId: entry.selectedExerciseId,
-    displayName: entry.displayName,
+    displayName:
+      entry.selectedExerciseId !== entry.exerciseId ? entry.selectedExerciseName : entry.displayName,
     position: entry.position,
     targetNote: entry.targetNote,
     measurementType: entry.measurementType,
@@ -314,6 +320,7 @@ export async function updateSetEntryForUser(clerkUserId: string, draft: SetDraft
       weight: draft.weight,
       reps: draft.reps,
       rpe: draft.rpe,
+      kind: draft.kind,
       completed: draft.completed,
       // Uses the draft's exact client time so the rest timer is accurate
       completedAt: draft.completed ? new Date() : null,
@@ -576,3 +583,185 @@ async function getPreviousPerformances(
 
   return previous;
 } 
+/** Swaps the performed exercise for an entry (ownership proven via the parent session). */
+export async function updateSelectedExerciseForUser(
+  clerkUserId: string,
+  exerciseEntryId: string,
+  exerciseId: string,
+): Promise<{
+  selectedExerciseId: string;
+  displayName: string;
+  measurementType: string;
+  defaultUnit: UnitPreference | 'none';
+  primaryMuscles: string[];
+  images: string[];
+  instructions: string[];
+}> {
+  const ownership = await db
+    .select({ entryId: workoutExerciseEntries.id, clerkUserId: workoutSessions.clerkUserId })
+    .from(workoutExerciseEntries)
+    .innerJoin(workoutSessions, eq(workoutSessions.id, workoutExerciseEntries.sessionId))
+    .where(and(eq(workoutExerciseEntries.id, exerciseEntryId), eq(workoutSessions.clerkUserId, clerkUserId)))
+    .limit(1);
+
+  const owner = ownership[0];
+  if (!owner) {
+    throw new AppError('not_found', 'Exercise entry was not found.');
+  }
+  assertUserScopedRecord(owner, clerkUserId);
+
+  const [exercise] = await db
+    .select({
+      id: exercises.id,
+      name: exercises.name,
+      measurementType: exercises.measurementType,
+      defaultUnit: exercises.defaultUnit,
+      primaryMuscles: exercises.primaryMuscles,
+      images: exercises.images,
+      instructions: exercises.instructions,
+    })
+    .from(exercises)
+    .where(eq(exercises.id, exerciseId))
+    .limit(1);
+
+  if (!exercise) {
+    throw new AppError('not_found', 'Exercise was not found.');
+  }
+
+  await db
+    .update(workoutExerciseEntries)
+    .set({ selectedExerciseId: exercise.id, updatedAt: new Date() })
+    .where(eq(workoutExerciseEntries.id, exerciseEntryId));
+
+  return {
+    selectedExerciseId: exercise.id,
+    displayName: exercise.name,
+    measurementType: exercise.measurementType,
+    defaultUnit: exercise.defaultUnit as UnitPreference | 'none',
+    primaryMuscles: (exercise.primaryMuscles as string[]) ?? [],
+    images: (exercise.images as string[]) ?? [],
+    instructions: (exercise.instructions as string[]) ?? [],
+  };
+}
+
+/** Appends a working set to an exercise entry (ownership proven via the parent session). */
+export async function addSetForUser(clerkUserId: string, exerciseEntryId: string): Promise<SetEntryView> {
+  const ownership = await db
+    .select({ entryId: workoutExerciseEntries.id, clerkUserId: workoutSessions.clerkUserId })
+    .from(workoutExerciseEntries)
+    .innerJoin(workoutSessions, eq(workoutSessions.id, workoutExerciseEntries.sessionId))
+    .where(and(eq(workoutExerciseEntries.id, exerciseEntryId), eq(workoutSessions.clerkUserId, clerkUserId)))
+    .limit(1);
+
+  const owner = ownership[0];
+  if (!owner) {
+    throw new AppError('not_found', 'Exercise entry was not found.');
+  }
+  assertUserScopedRecord(owner, clerkUserId);
+
+  const existing = await db
+    .select({ position: setEntries.position, unit: setEntries.unit })
+    .from(setEntries)
+    .where(eq(setEntries.workoutExerciseEntryId, exerciseEntryId))
+    .orderBy(desc(setEntries.position));
+
+  const nextPosition = (existing[0]?.position ?? 0) + 1;
+  const unit = existing[0]?.unit ?? 'none';
+  const id = createSetEntryId(exerciseEntryId, nextPosition);
+
+  await db
+    .insert(setEntries)
+    .values({
+      id,
+      workoutExerciseEntryId: exerciseEntryId,
+      position: nextPosition,
+      targetReps: null,
+      targetLabel: '—',
+      unit,
+    })
+    .onConflictDoNothing();
+
+  return {
+    id,
+    position: nextPosition,
+    targetReps: null,
+    targetLabel: '—',
+    weight: null,
+    reps: null,
+    unit: unit as UnitPreference | 'none',
+    rpe: null,
+    kind: 'working',
+    completed: false,
+    completedAt: null,
+  };
+}
+
+/** Deletes a set entry (ownership proven via the parent session). */
+export async function removeSetForUser(clerkUserId: string, setEntryId: string): Promise<void> {
+  const ownership = await db
+    .select({ setId: setEntries.id, clerkUserId: workoutSessions.clerkUserId })
+    .from(setEntries)
+    .innerJoin(workoutExerciseEntries, eq(workoutExerciseEntries.id, setEntries.workoutExerciseEntryId))
+    .innerJoin(workoutSessions, eq(workoutSessions.id, workoutExerciseEntries.sessionId))
+    .where(and(eq(setEntries.id, setEntryId), eq(workoutSessions.clerkUserId, clerkUserId)))
+    .limit(1);
+
+  const row = ownership[0];
+  if (!row) {
+    throw new AppError('not_found', 'Set entry was not found.');
+  }
+  assertUserScopedRecord(row, clerkUserId);
+
+  await db.delete(setEntries).where(eq(setEntries.id, setEntryId));
+}
+
+/** Average duration (minutes) of the user's recent completed sessions, or null if none. */
+export async function getAverageWorkoutMinutes(clerkUserId: string): Promise<number | null> {
+  const rows = await db
+    .select({ startedAt: workoutSessions.startedAt, completedAt: workoutSessions.completedAt })
+    .from(workoutSessions)
+    .where(and(eq(workoutSessions.clerkUserId, clerkUserId), eq(workoutSessions.status, 'completed')))
+    .orderBy(desc(workoutSessions.completedAt))
+    .limit(20);
+
+  const durations = rows
+    .filter((row) => row.completedAt && row.startedAt)
+    .map((row) => (new Date(row.completedAt as Date).getTime() - new Date(row.startedAt).getTime()) / 60000)
+    .filter((minutes) => minutes > 0 && minutes < 360);
+
+  if (durations.length === 0) {
+    return null;
+  }
+
+  return Math.round(durations.reduce((total, minutes) => total + minutes, 0) / durations.length);
+}
+
+/** Returns the global exercise catalogue for the in-workout swap picker. */
+export async function getExerciseCatalog(): Promise<ExerciseCatalogItem[]> {
+  const rows = await db
+    .select({
+      id: exercises.id,
+      name: exercises.name,
+      category: exercises.category,
+      equipment: exercises.equipment,
+      measurementType: exercises.measurementType,
+      defaultUnit: exercises.defaultUnit,
+      primaryMuscles: exercises.primaryMuscles,
+      images: exercises.images,
+      instructions: exercises.instructions,
+    })
+    .from(exercises)
+    .orderBy(asc(exercises.name));
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    equipment: row.equipment,
+    measurementType: row.measurementType,
+    defaultUnit: row.defaultUnit as UnitPreference | 'none',
+    primaryMuscles: (row.primaryMuscles as string[]) ?? [],
+    images: (row.images as string[]) ?? [],
+    instructions: (row.instructions as string[]) ?? [],
+  }));
+}
