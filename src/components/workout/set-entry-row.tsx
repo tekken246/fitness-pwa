@@ -93,7 +93,7 @@ export function SetEntryRow({ set, nextSetCompletedAt, restSeconds, onChange, on
 
   const adjustWeight = (delta: number) => {
     const base = set.weight ?? 0;
-    const next = Math.max(0, Math.round((base + delta) * 100) / 100);
+    const next = Math.max(0, Math.min(2000, Math.round((base + delta) * 100) / 100));
     onChange({ ...set, weight: next });
   };
 
@@ -131,7 +131,7 @@ export function SetEntryRow({ set, nextSetCompletedAt, restSeconds, onChange, on
               className="h-[44px] w-full rounded-[10px] border border-white/[0.08] bg-white/[0.03] text-center text-[16px] font-bold text-white focus:border-[#22C55E]/50 focus:outline-none placeholder:text-white/20 transition-colors"
               inputMode="decimal"
               min="0"
-              onChange={(event) => onChange({ ...set, weight: parseNullableNumber(event.currentTarget.value) })}
+              onChange={(event) => { const parsed = parseNullableNumber(event.currentTarget.value); onChange({ ...set, weight: parsed === null ? null : Math.max(0, Math.min(2000, Math.round(parsed * 100) / 100)) }); }}
               placeholder="—"
               type="number"
               value={set.weight ?? ''}
@@ -154,7 +154,7 @@ export function SetEntryRow({ set, nextSetCompletedAt, restSeconds, onChange, on
             className="h-[44px] w-full rounded-[10px] border border-white/[0.08] bg-white/[0.03] text-center text-[16px] font-bold text-white focus:border-[#22C55E]/50 focus:outline-none placeholder:text-white/20 transition-colors"
             inputMode="numeric"
             min="0"
-            onChange={(event) => onChange({ ...set, reps: parseNullableNumber(event.currentTarget.value) })}
+            onChange={(event) => { const parsed = parseNullableNumber(event.currentTarget.value); onChange({ ...set, reps: parsed === null ? null : Math.max(0, Math.min(1000, Math.trunc(parsed))) }); }}
             placeholder="—"
             type="number"
             value={set.reps ?? ''}
