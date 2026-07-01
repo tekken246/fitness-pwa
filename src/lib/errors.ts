@@ -9,15 +9,21 @@ export class AppError extends Error {
   }
 }
 
-/** Converts unknown exceptions into a user-safe message. */
+/**
+ * TEMPORARY DIAGNOSTIC VERSION.
+ * Surfaces the real error text in the UI so we can identify the complete-workout
+ * failure. After we've found the cause, revert this to the generic message
+ * (return 'Something went wrong. Please try again.').
+ */
 export function toErrorMessage(error: unknown): string {
   if (error instanceof AppError) {
     return error.message;
   }
 
-  // Never surface internal error details (DB/driver messages, stack traces) to the UI.
-  // Log the real error server-side and return a generic, safe message.
   console.error('[unhandled action error]', error);
 
-  return 'Something went wrong. Please try again.';
+  const detail =
+    error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+
+  return `DEBUG: ${detail}`;
 }
