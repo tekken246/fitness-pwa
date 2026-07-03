@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { ChevronRight, Play, CheckCircle2 } from 'lucide-react';
+import { ChevronRight, Play, CheckCircle2, Flame, TrendingUp, Dumbbell, Timer } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { startTodayWorkoutAction, startWorkoutForDayAction } from '@/lib/actions/workout-actions';
@@ -10,6 +10,8 @@ import { getRoutinesForUser, getTemplateDayByIsoWeekday } from '@/lib/data/worko
 import { getAverageWorkoutMinutes } from '@/lib/data/workout-sessions';
 import { getRecentWorkoutSessions, getSessionForDayOnDate } from '@/lib/data/workout-sessions';
 import { getIsoWeekdayForTimezone, getLocalDateForTimezone } from '@/lib/timezone';
+import { currentUser } from '@clerk/nextjs/server';
+import { getWorkoutStreak, getWeeklyGoalProgress, getVolumeMomentum, getSessionMetricsMap } from '@/lib/data/activity-stats';
 
 /** Renders the authenticated premium dashboard and today's workout. */
 export default async function TodayPage(): Promise<ReactNode> {
@@ -29,43 +31,100 @@ export default async function TodayPage(): Promise<ReactNode> {
   const customRoutines = await getRoutinesForUser(clerkUserId);
   const avgWorkoutMinutes = await getAverageWorkoutMinutes(clerkUserId);
 
+  // Batch 2 stats (additive aggregate queries)
+  const user = await currentUser();
+  const firstName = user?.firstName ?? null;
+  const [streak, weekly, momentum] = await Promise.all([
+    getWorkoutStreak(clerkUserId, settings.timezone, now),
+    getWeeklyGoalProgress(clerkUserId, settings.timezone, now),
+    getVolumeMomentum(clerkUserId, settings.timezone, now),
+  ]);
+  const recentMetrics = await getSessionMetricsMap(recentSessions.slice(0, 3).map((session) => session.id));
+
+  const unitLabel = settings.unit;
+  const hour = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: settings.timezone }).format(now));
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const ringRadius = 15;
+  const ringCircumference = 2 * Math.PI * ringRadius;
+  const ringOffset = ringCircumference * (1 - Math.min(1, weekly.count / weekly.goal));
+
+  const formatVol = (value: number): string => (value >= 1000 ? `${(value / 1000).toFixed(1)}k` : `${Math.round(value)}`);
+  const formatDur = (seconds: number | null): string | null => {
+    if (seconds === null) return null;
+    const minutes = Math.round(seconds / 60);
+    if (minutes < 60) return `${minutes}m`;
+    return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  };
+
   // Date Formatting for Header
   const dayName = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: settings.timezone }).format(now);
   const dateFormatted = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', timeZone: settings.timezone }).format(now);
-
-  // ISO Week Days (1 = Mon, 7 = Sun)
-  const weekDays = [1, 2, 3, 4, 5, 6, 7];
-  const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
   return (
     <div className="space-y-8 pb-24 text-white">
       
       {/* T1. Compact Premium Header */}
       <div className="px-1 pt-2">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/45">{dayName}</p>
-        <h1 className="mt-1 text-[28px] font-bold leading-tight text-white">{dateFormatted}</h1>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/45">{dayName} · {dateFormatted}</p>
+        <h1 className="mt-1 text-[28px] font-bold leading-tight text-white">
+          {greeting}{firstName ? `, ${firstName}` : ''}
+        </h1>
       </div>
 
-      {/* T2. Weekly Activity Bar */}
-      <div className="flex flex-col gap-3 px-1">
-        <div className="flex items-center justify-between">
-          {weekDays.map((wd, index) => {
-            const isToday = wd === dayOfWeek;
-            const isPast = wd < dayOfWeek;
-            
-            return (
-              <div 
-                key={wd}
-                className={`flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-bold transition-all
-                  ${isToday ? 'border-2 border-[#22C55E] text-[#22C55E]' : 
-                    isPast ? 'bg-[#22C55E] text-black' : 'bg-white/5 text-white/30'}`}
-              >
-                {dayLabels[index]}
-              </div>
-            );
-          })}
+      {/* T2. Stats strip: streak · weekly goal · momentum */}
+      <div className="grid grid-cols-3 gap-3 px-1">
+        <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.05] p-4">
+          <div className="flex items-center gap-1.5 text-amber-400">
+            <Flame className="h-4 w-4" />
+            <span className="text-[24px] font-black leading-none text-white">{streak}</span>
+          </div>
+          <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.12em] text-white/40">Day streak</p>
         </div>
-        <p className="text-[13px] font-normal text-white/45 tracking-wide">Stay consistent this week</p>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.05] p-4">
+          <div className="flex items-center gap-2">
+            <div className="relative h-9 w-9 shrink-0">
+              <svg width="36" height="36" viewBox="0 0 36 36">
+                <circle cx="18" cy="18" r={ringRadius} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="3.5" />
+                <circle
+                  cx="18"
+                  cy="18"
+                  r={ringRadius}
+                  fill="none"
+                  stroke="#22C55E"
+                  strokeWidth="3.5"
+                  strokeLinecap="round"
+                  strokeDasharray={ringCircumference}
+                  strokeDashoffset={ringOffset}
+                  transform="rotate(-90 18 18)"
+                />
+              </svg>
+            </div>
+            <span className="text-[16px] font-black leading-none text-white">
+              {weekly.count}
+              <span className="text-white/40">/{weekly.goal}</span>
+            </span>
+          </div>
+          <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.12em] text-white/40">This week</p>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.05] p-4">
+          {momentum.deltaPct === null ? (
+            <div className="flex items-center gap-1.5 text-white/70">
+              <TrendingUp className="h-4 w-4" />
+              <span className="text-[16px] font-black leading-none text-white">New</span>
+            </div>
+          ) : (
+            <div className={`flex items-center gap-1.5 ${momentum.deltaPct >= 0 ? 'text-[#22C55E]' : 'text-white/60'}`}>
+              <TrendingUp className={`h-4 w-4 ${momentum.deltaPct >= 0 ? '' : 'rotate-180'}`} />
+              <span className="text-[20px] font-black leading-none text-white">
+                {momentum.deltaPct >= 0 ? '+' : ''}
+                {momentum.deltaPct}%
+              </span>
+            </div>
+          )}
+          <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.12em] text-white/40">Vs last week</p>
+        </div>
       </div>
 
       {/* T3. Redesigned Workout Card (Elevation Level 2) */}
@@ -135,18 +194,35 @@ export default async function TodayPage(): Promise<ReactNode> {
         </div>
         
         <div className="space-y-3">
-          {recentSessions.slice(0, 3).map((session) => (
-            <Link key={session.id} href={`/sessions/${session.id}`} className="group flex items-center justify-between rounded-[16px] border border-white/[0.08] bg-white/[0.05] p-4 transition-colors hover:border-white/[0.12] hover:bg-white/[0.07]">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h4 className="text-[15px] font-semibold text-white group-hover:text-[#22C55E] transition-colors">{session.muscleGroup}</h4>
-                  {session.status === 'completed' && <CheckCircle2 className="h-3.5 w-3.5 text-[#22C55E]" />}
+          {recentSessions.slice(0, 3).map((session) => {
+            const m = recentMetrics.get(session.id);
+            const dur = formatDur(m?.durationSeconds ?? null);
+            return (
+              <Link key={session.id} href={`/sessions/${session.id}`} className="group flex items-center justify-between rounded-[16px] border border-white/[0.08] bg-white/[0.05] p-4 transition-colors hover:border-white/[0.12] hover:bg-white/[0.07]">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-[15px] font-semibold text-white group-hover:text-[#22C55E] transition-colors">{session.muscleGroup}</h4>
+                    {session.status === 'completed' && <CheckCircle2 className="h-3.5 w-3.5 text-[#22C55E]" />}
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12px] text-white/45">
+                    <span>{session.localDate}</span>
+                    {m && m.sets > 0 ? (
+                      <>
+                        <span className="flex items-center gap-1"><Dumbbell className="h-3 w-3" /> {formatVol(m.volume)} {unitLabel}</span>
+                        <span>{m.sets} sets</span>
+                        {dur ? (
+                          <span className="flex items-center gap-1"><Timer className="h-3 w-3" /> {dur}</span>
+                        ) : null}
+                      </>
+                    ) : (
+                      <span className="capitalize">{session.status}</span>
+                    )}
+                  </div>
                 </div>
-                <p className="mt-1 text-[13px] text-white/45 tracking-wide">{session.localDate} • {session.status}</p>
-              </div>
-              <ChevronRight className="h-5 w-5 text-white/30 group-hover:text-white/60 transition-colors" />
-            </Link>
-          ))}
+                <ChevronRight className="h-5 w-5 shrink-0 text-white/30 group-hover:text-white/60 transition-colors" />
+              </Link>
+            );
+          })}
           {recentSessions.length === 0 && (
             <div className="rounded-[16px] border border-dashed border-white/[0.08] p-6 text-center">
               <p className="text-[13px] text-white/45">No sessions yet. Time to get started!</p>

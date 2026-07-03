@@ -1,13 +1,14 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { desc, eq, sql } from 'drizzle-orm';
-import { Search, ChevronRight, Activity, Clock, Dumbbell, Trophy } from 'lucide-react';
+import { Search, ChevronRight, Activity, Clock, Dumbbell, Trophy, Flame } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { db } from '@/db/client';
 import { workoutSessions, workoutTemplateDays, workoutExerciseEntries, exercises } from '@/db/schema';
 import { requireClerkUserId } from '@/lib/auth';
 import { getOrCreateUserSettings } from '@/lib/data/settings';
+import { getWorkoutStreak, getHistoryHeadlineStats, getSessionMetricsMap } from '@/lib/data/activity-stats';
 
 interface PageProps {
   searchParams: Promise<{ tab?: string }>;
@@ -58,6 +59,21 @@ export default async function HistoryPage({ searchParams }: PageProps): Promise<
 
   // Get today's day of week securely in user's timezone
   const now = new Date();
+
+  // Batch 2 stats (additive aggregate queries)
+  const [streak, headline, sessionMetrics] = await Promise.all([
+    getWorkoutStreak(clerkUserId, settings.timezone, now),
+    getHistoryHeadlineStats(clerkUserId, settings.timezone, now),
+    getSessionMetricsMap(realSessions.map((session) => session.id)),
+  ]);
+  const unitLabel = settings.unit;
+  const formatVol = (value: number): string => (value >= 1000 ? `${(value / 1000).toFixed(1)}k` : `${Math.round(value)}`);
+  const formatDur = (seconds: number | null): string | null => {
+    if (seconds === null) return null;
+    const minutes = Math.round(seconds / 60);
+    return minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  };
+
   const formatterEn = new Intl.DateTimeFormat('en-US', {
     timeZone: settings.timezone,
     weekday: 'short',
@@ -130,7 +146,35 @@ export default async function HistoryPage({ searchParams }: PageProps): Promise<
 
       {tab === 'sessions' && (
         <div className="space-y-4 animate-in fade-in duration-200">
-          
+
+          {/* Headline stats */}
+          <div className="grid grid-cols-3 gap-3 px-1">
+            <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.05] p-4">
+              <div className="flex items-center gap-1.5 text-[#22C55E]">
+                <Trophy className="h-4 w-4" />
+                <span className="text-[22px] font-black leading-none text-white">{headline.totalWorkouts}</span>
+              </div>
+              <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.12em] text-white/40">Workouts</p>
+            </div>
+            <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.05] p-4">
+              <div className="flex items-center gap-1.5 text-amber-400">
+                <Flame className="h-4 w-4" />
+                <span className="text-[22px] font-black leading-none text-white">{streak}</span>
+              </div>
+              <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.12em] text-white/40">Day streak</p>
+            </div>
+            <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.05] p-4">
+              <div className="flex items-center gap-1.5 text-white/80">
+                <Activity className="h-4 w-4" />
+                <span className="text-[18px] font-black leading-none text-white">
+                  {formatVol(headline.monthVolume)}
+                  <span className="ml-0.5 text-[11px] uppercase text-white/40">{unitLabel}</span>
+                </span>
+              </div>
+              <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.12em] text-white/40">This month</p>
+            </div>
+          </div>
+
           {/* =========================================
               NEW: HORIZONTAL CALENDAR HEATMAP 
               ========================================= */}
@@ -172,21 +216,32 @@ export default async function HistoryPage({ searchParams }: PageProps): Promise<
                 No workout logs found. Start a workout on the dashboard to see history!
               </div>
             ) : (
-              realSessions.map((session, index) => (
-                <Link key={session.id} href={`/sessions/${session.id}`} className="block">
-                  <Card className="rounded-[20px] border-white/[0.08] bg-white/[0.05] p-4 hover:border-white/[0.15] hover:bg-white/[0.07] transition-all">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="text-[17px] font-semibold tracking-tight text-white">{session.muscleGroup}</h3>
-                        <p className="text-[13px] font-medium text-white/45 mt-0.5">{session.localDate}</p>
+              realSessions.map((session) => {
+                const m = sessionMetrics.get(session.id);
+                const dur = formatDur(m?.durationSeconds ?? null);
+                return (
+                  <Link key={session.id} href={`/sessions/${session.id}`} className="block">
+                    <Card className="rounded-[20px] border-white/[0.08] bg-white/[0.05] p-4 hover:border-white/[0.15] hover:bg-white/[0.07] transition-all">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="text-[17px] font-semibold tracking-tight text-white">{session.muscleGroup}</h3>
+                          <p className="text-[13px] font-medium text-white/45 mt-0.5">{session.localDate}</p>
+                        </div>
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#22C55E]">
+                          {session.status}
+                        </span>
                       </div>
-                      <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#22C55E]">
-                        {session.status}
-                      </span>
-                    </div>
-                  </Card>
-                </Link>
-              ))
+                      {m && m.sets > 0 ? (
+                        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-white/[0.06] pt-3 text-[12px] font-medium text-white/55">
+                          <span className="flex items-center gap-1.5"><Dumbbell className="h-3.5 w-3.5 text-white/40" /> {formatVol(m.volume)} {unitLabel}</span>
+                          <span className="flex items-center gap-1.5"><Activity className="h-3.5 w-3.5 text-white/40" /> {m.sets} sets</span>
+                          {dur ? <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5 text-white/40" /> {dur}</span> : null}
+                        </div>
+                      ) : null}
+                    </Card>
+                  </Link>
+                );
+              })
             )}
           </div>
         </div>
