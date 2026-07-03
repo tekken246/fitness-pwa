@@ -13,6 +13,7 @@ const baseSet: SetEntryView = {
   reps: null,
   unit: 'lb',
   rpe: null,
+  kind: 'working',
   completed: false,
 };
 
@@ -28,12 +29,21 @@ describe('SetEntryRow', () => {
     expect(onChange).toHaveBeenCalledWith({ ...baseSet, reps: 8 });
   });
 
-  it('toggles set completion', () => {
+  it('toggles set completion via the check control', () => {
     const onChange = vi.fn();
     render(<SetEntryRow set={baseSet} onChange={onChange} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Log' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Complete set 1' }));
 
-    expect(onChange).toHaveBeenCalledWith({ ...baseSet, completed: true });
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ id: 'set_1', completed: true }));
+  });
+
+  it('prefills last time values on completion when fields are untouched', () => {
+    const onChange = vi.fn();
+    render(<SetEntryRow set={baseSet} previous={{ weight: 100, reps: 5, unit: 'lb', localDate: '2024-01-01' }} onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Complete set 1' }));
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ completed: true, weight: 100, reps: 5 }));
   });
 });

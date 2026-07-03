@@ -20,34 +20,38 @@ export default async function AddExercisePage({ params }: PageProps): Promise<Re
   // Only the owner of this routine may add exercises to it.
   await assertEditableTemplateDay(dayId, clerkUserId);
 
-  // Verify the routine exists
-  const [routine] = await db
-    .select()
-    .from(workoutTemplateDays)
-    .where(eq(workoutTemplateDays.id, dayId));
-
+  const [routine] = await db.select().from(workoutTemplateDays).where(eq(workoutTemplateDays.id, dayId));
   if (!routine) notFound();
 
-  // Fetch all exercises from the database, ordered alphabetically
+  // Fetch only the columns the picker renders, keeping the payload small for ~800 rows.
   const allExercises = await db
-    .select()
+    .select({
+      id: exercises.id,
+      name: exercises.name,
+      category: exercises.category,
+      equipment: exercises.equipment,
+      primaryMuscles: exercises.primaryMuscles,
+      images: exercises.images,
+    })
     .from(exercises)
     .orderBy(asc(exercises.name));
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col space-y-4">
-      {/* Header */}
-      <div className="shrink-0 flex items-center gap-4">
-        <Link href={`/workouts/${dayId}/edit`} className="rounded-full bg-muted p-2 text-foreground hover:bg-muted/80 transition-colors">
+    <div className="flex h-[calc(100vh-4rem)] flex-col space-y-4 text-white">
+      <div className="flex shrink-0 items-center gap-3">
+        <Link
+          href={`/workouts/${dayId}/edit`}
+          aria-label="Back to routine"
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.05] text-white/70 transition-colors hover:text-white"
+        >
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <div>
-          <h1 className="text-2xl font-black tracking-tight">Add Exercise</h1>
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-muted">{routine.name}</p>
+        <div className="min-w-0">
+          <h1 className="text-[22px] font-bold tracking-tight text-white">Add exercises</h1>
+          <p className="truncate text-[11px] font-bold uppercase tracking-[0.2em] text-white/40">{routine.name}</p>
         </div>
       </div>
 
-      {/* Interactive Client-Side Search List */}
       <ExerciseSearchList exercises={allExercises} dayId={dayId} />
     </div>
   );

@@ -45,7 +45,7 @@ export async function createFlexibleRoutineAction(formData: FormData) {
   });
 
   revalidatePath('/workouts');
-  redirect(`/workouts/${dayId}/edit`);
+  redirect(`/workouts/${dayId}/edit/add-exercise`);
 }
 
 export async function deleteFlexibleRoutineAction(formData: FormData) {

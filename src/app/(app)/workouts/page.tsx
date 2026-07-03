@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { Plus, Dumbbell, CalendarDays, ChevronRight, Play, Moon } from 'lucide-react';
+import { Dumbbell, CalendarDays, ChevronRight, Play, Moon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { startWorkoutForDayAction } from '@/lib/actions/workout-actions';
 import { getRoutinesForUser, getSeedWeeklyPlan } from '@/lib/data/workout-templates';
-import { createFlexibleRoutineAction } from '@/lib/actions/routine-actions';
+import { CreateRoutineButton } from '@/components/workout/create-routine-button';
 import { requireClerkUserId } from '@/lib/auth';
 
 interface PageProps {
@@ -56,39 +56,9 @@ export default async function WorkoutsPage({ searchParams }: PageProps): Promise
       {tab === 'routines' && (
         <section className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
           
-          {/* Action Card: Create Routine */}
-          <Card className="rounded-[20px] border-white/[0.08] bg-white/[0.05] p-4 shadow-sm">
-            <div className="mb-3 flex items-center gap-2">
-              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#22C55E]/10">
-                <Plus className="h-4 w-4 text-[#22C55E]" />
-              </div>
-              <h3 className="text-[15px] font-semibold text-white">New Routine</h3>
-            </div>
-            <form action={createFlexibleRoutineAction} className="flex flex-col gap-2">
-              <div className="flex gap-2">
-                <input 
-                  name="name" 
-                  type="text" 
-                  placeholder="Name (e.g. Push Day)" 
-                  className="h-[44px] w-full rounded-[14px] border border-white/5 bg-white/[0.03] px-3 text-[14px] text-white focus:border-[#22C55E]/50 focus:outline-none transition-colors placeholder:text-white/30" 
-                  required
-                />
-                <input 
-                  name="muscleGroup" 
-                  type="text" 
-                  placeholder="Muscles" 
-                  className="h-[44px] w-[110px] rounded-[14px] border border-white/5 bg-white/[0.03] px-3 text-[14px] text-white focus:border-[#22C55E]/50 focus:outline-none transition-colors placeholder:text-white/30" 
-                  required
-                />
-              </div>
-              <button 
-                type="submit" 
-                className="mt-1 h-[44px] w-full rounded-[14px] bg-white/[0.08] text-[14px] font-semibold text-white hover:bg-[#22C55E] hover:text-black transition-colors"
-              >
-                Create
-              </button>
-            </form>
-          </Card>
+          {/* Create routine (collapsible → opens the exercise picker on submit) */}
+          <CreateRoutineButton />
+
 
           {/* Routine List */}
           <div className="grid gap-3">
@@ -143,6 +113,9 @@ export default async function WorkoutsPage({ searchParams }: PageProps): Promise
 // ----------------------------------------------------------------------
 
 function RoutineCard({ day }: { day: any }) {
+  const count: number = day.exercises?.length ?? 0;
+  const estMinutes = Math.max(15, count * 8);
+
   return (
     <Card className="flex flex-col justify-between overflow-hidden rounded-[20px] border-white/[0.08] bg-white/[0.05] shadow-sm hover:border-white/[0.15] transition-colors">
       <div className="p-4 space-y-3">
@@ -167,6 +140,11 @@ function RoutineCard({ day }: { day: any }) {
             ? day.exercises.join(' • ') 
             : 'No exercises added'}
         </p>
+
+        <p className="flex items-center gap-1.5 text-[12px] font-semibold text-white/40">
+          <Dumbbell className="h-3.5 w-3.5" /> {count} exercise{count === 1 ? '' : 's'}
+          {count > 0 ? ` · ~${estMinutes} min` : ''}
+        </p>
       </div>
 
       {(day.exercises && day.exercises.length > 0) && (
@@ -186,6 +164,8 @@ function RoutineCard({ day }: { day: any }) {
 function ScheduleCard({ day }: { day: any }) {
   const isRest = day.exercises.length === 0 && !day.isOptional;
   const dayName = day.name; // e.g. "Monday"
+  const count: number = day.exercises?.length ?? 0;
+  const estMinutes = Math.max(15, count * 8);
 
   return (
     <Card className={`overflow-hidden rounded-[20px] border-white/[0.08] bg-white/[0.05] shadow-sm ${isRest ? 'opacity-60' : ''}`}>
@@ -208,9 +188,14 @@ function ScheduleCard({ day }: { day: any }) {
             <span className="text-[13px] font-medium">Rest Day</span>
           </div>
         ) : (
-          <p className="text-[13px] font-medium text-white/50 leading-relaxed line-clamp-2">
-            {day.exercises.join(' • ')}
-          </p>
+          <div className="space-y-2">
+            <p className="text-[13px] font-medium text-white/50 leading-relaxed line-clamp-2">
+              {day.exercises.join(' • ')}
+            </p>
+            <p className="flex items-center gap-1.5 text-[12px] font-semibold text-white/40">
+              <Dumbbell className="h-3.5 w-3.5" /> {count} exercise{count === 1 ? '' : 's'} · ~{estMinutes} min
+            </p>
+          </div>
         )}
       </div>
 

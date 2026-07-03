@@ -108,102 +108,127 @@ export default async function ProgressPage({ searchParams }: PageProps): Promise
   // Calculate the highest value in the chart to scale the bars dynamically
   const chartMaxWeight = Math.max(...chartData.map(d => d.weight), 1);
 
+  // ---- presentation-only derivations (no new queries) ----
+  const chartMinWeight = chartData.length > 0 ? Math.min(...chartData.map((d) => d.weight)) : 0;
+  const latestWeight = chartData.at(-1)?.weight ?? 0;
+  const priorWeight = chartData.length >= 2 ? chartData[chartData.length - 2].weight : null;
+  const weightDelta = priorWeight !== null ? Math.round((latestWeight - priorWeight) * 10) / 10 : null;
+  const isPeak = chartData.length > 0 && latestWeight > 0 && latestWeight >= chartMaxWeight;
+
+  const CHART_W = 300;
+  const CHART_H = 130;
+  const CHART_TOP = 12;
+  const CHART_BOTTOM = 108;
+  const pointCount = chartData.length;
+  const xForIndex = (i: number): number => (pointCount <= 1 ? CHART_W / 2 : 8 + (i * (CHART_W - 16)) / (pointCount - 1));
+  const yForWeight = (weight: number): number => {
+    if (chartMaxWeight === chartMinWeight) return (CHART_TOP + CHART_BOTTOM) / 2;
+    return CHART_BOTTOM - ((weight - chartMinWeight) / (chartMaxWeight - chartMinWeight)) * (CHART_BOTTOM - CHART_TOP);
+  };
+  const linePath = chartData
+    .map((d, i) => `${i === 0 ? 'M' : 'L'} ${xForIndex(i).toFixed(1)} ${yForWeight(d.weight).toFixed(1)}`)
+    .join(' ');
+  const areaPath =
+    pointCount > 0 ? `${linePath} L ${xForIndex(pointCount - 1).toFixed(1)} ${CHART_H} L ${xForIndex(0).toFixed(1)} ${CHART_H} Z` : '';
+
   return (
     <div className="space-y-6 pb-28 text-white">
       <div className="px-1 pt-2">
         <h1 className="text-[28px] font-bold tracking-tight text-white">Progress</h1>
       </div>
 
-      <Card className="rounded-[20px] border-white/10 bg-white/[0.07] p-5 shadow-[0_4px_24px_rgba(0,0,0,0.3)]">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#22C55E]">Analytics Engine</p>
-            <h2 className="mt-1 text-[22px] font-bold tracking-tight text-white">Volume Metrics</h2>
-            <p className="text-[13px] font-medium text-white/60 mt-1 flex items-center gap-1.5">
-              <Calendar className="h-4 w-4" /> Live metrics synchronization active
-            </p>
-          </div>
-        </div>
-      </Card>
-
       <div className="px-1">
         <ExerciseSelector exercises={exercisesForSelector} currentExercise={currentExerciseName} />
       </div>
 
-      <div className="px-1 py-1 flex items-center justify-between">
-        <h2 className="text-[17px] font-bold text-white tracking-tight">{currentExerciseName} Stats</h2>
-        {chartData.length >= 2 && chartData[chartData.length - 1].weight >= chartData[chartData.length - 2].weight ? (
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-[#22C55E]/15 px-3 py-1 border border-[#22C55E]/30 text-[#22C55E] text-[12px] font-semibold">
-            <TrendingUp className="h-3.5 w-3.5" /> Improving Trend
+      <Card className="rounded-[24px] border-[#22C55E]/20 bg-[#22C55E]/[0.06] p-5 shadow-[0_4px_24px_rgba(0,0,0,0.3)]">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#22C55E]">Estimated 1RM</p>
+            <h2 className="mt-1 truncate text-[15px] font-semibold text-white/80">{currentExerciseName}</h2>
           </div>
-        ) : chartData.length > 0 ? (
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 border border-white/20 text-white/70 text-[12px] font-semibold">
-            Stable Trend
-          </div>
-        ) : null}
-      </div>
+          {isPeak ? (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/[0.12] px-2.5 py-1 text-[11px] font-bold text-amber-400">
+              <Trophy className="h-3.5 w-3.5" /> Peak
+            </span>
+          ) : null}
+        </div>
+        <div className="mt-3 flex items-end gap-2">
+          <span className="text-[48px] font-black leading-none tracking-tight text-white">{estimated1RM || '—'}</span>
+          <span className="pb-1.5 text-[15px] font-bold uppercase text-white/50">{unitLabel}</span>
+          {weightDelta !== null && weightDelta !== 0 ? (
+            <span
+              className={
+                'mb-1.5 ml-auto inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-bold ' +
+                (weightDelta > 0 ? 'bg-[#22C55E]/15 text-[#22C55E]' : 'bg-white/10 text-white/60')
+              }
+            >
+              <TrendingUp className={'h-3.5 w-3.5' + (weightDelta > 0 ? '' : ' rotate-180')} />
+              {weightDelta > 0 ? '+' : ''}
+              {weightDelta} {unitLabel}
+            </span>
+          ) : null}
+        </div>
+      </Card>
 
-      <div className="grid grid-cols-3 gap-2 px-1">
-        <Card className="flex flex-col items-center justify-center rounded-[16px] border-white/[0.08] bg-white/[0.05] p-4 text-center">
-          <p className="text-[18px] font-bold text-white">
-            {totalVolume >= 1000 ? `${(totalVolume / 1000).toFixed(1)}k` : totalVolume}
-            <span className="text-[11px] text-white/50 ml-0.5 uppercase">{unitLabel}</span>
-          </p>
-          <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-white/40">Est. Vol</p>
-        </Card>
-        
-        <Card className="flex flex-col items-center justify-center rounded-[16px] border-white/[0.08] bg-white/[0.05] p-4 text-center">
-          <p className="text-[18px] font-bold text-white">
+      <div className="grid grid-cols-2 gap-3 px-1">
+        <Card className="rounded-[18px] border-white/[0.08] bg-white/[0.05] p-4">
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/40">Max weight</p>
+          <p className="mt-1.5 text-[28px] font-black leading-none tracking-tight text-white">
             {bestWeight}
-            <span className="text-[11px] text-white/50 ml-0.5 uppercase">{unitLabel}</span>
+            <span className="ml-1 text-[13px] font-bold uppercase text-white/40">{unitLabel}</span>
           </p>
-          <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-white/40">Max Wt</p>
         </Card>
-
-        <Card className="flex flex-col items-center justify-center rounded-[16px] border-[#22C55E]/20 bg-[#22C55E]/5 p-4 text-center">
-          <p className="text-[18px] font-bold text-[#22C55E]">
-            {estimated1RM}
-            <span className="text-[11px] text-[#22C55E]/60 ml-0.5 uppercase">{unitLabel}</span>
+        <Card className="rounded-[18px] border-white/[0.08] bg-white/[0.05] p-4">
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/40">Total volume</p>
+          <p className="mt-1.5 text-[28px] font-black leading-none tracking-tight text-white">
+            {totalVolume >= 1000 ? `${(totalVolume / 1000).toFixed(1)}k` : totalVolume}
+            <span className="ml-1 text-[13px] font-bold uppercase text-white/40">{unitLabel}</span>
           </p>
-          <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#22C55E]/60">E1RM</p>
         </Card>
       </div>
 
       <Card className="rounded-[20px] border-white/[0.08] bg-white/[0.03] p-5">
-        <h3 className="text-[13px] font-semibold text-white/70 mb-4">Max Weight Over Time</h3>
-        
-        {/* NATIVE TAILWIND BAR CHART */}
-        <div className="flex h-[140px] w-full items-end justify-between gap-2 rounded-[12px] border border-dashed border-white/10 bg-white/[0.02] p-4 pt-8">
-           {chartData.length > 0 ? (
-             chartData.map((dataPoint, index) => {
-               // Calculate height percentage relative to the maximum weight in the chart (minimum height 10%)
-               const heightPercentage = Math.max((dataPoint.weight / chartMaxWeight) * 100, 10);
-               
-               return (
-                 <div key={index} className="flex flex-1 flex-col items-center justify-end h-full gap-2 group">
-                   <div className="relative w-full flex justify-center h-full items-end">
-                     {/* Hover Tooltip */}
-                     <span className="absolute -top-6 text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                       {dataPoint.weight}
-                     </span>
-                     {/* The Bar */}
-                     <div 
-                       className="w-full max-w-[28px] bg-[#22C55E] rounded-t-sm hover:bg-[#22C55E]/80 transition-all duration-300"
-                       style={{ height: `${heightPercentage}%` }}
-                     />
-                   </div>
-                   <span className="text-[10px] font-semibold text-white/40 tracking-tighter">{dataPoint.date}</span>
-                 </div>
-               );
-             })
-           ) : (
-             <div className="flex w-full items-center justify-center h-full pb-4">
-               <p className="text-[13px] text-white/30 text-center">
-                 Complete a session with {currentExerciseName} to see your history chart.
-               </p>
-             </div>
-           )}
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-[13px] font-semibold text-white/70">Max weight over time</h3>
+          {chartData.length > 0 ? <span className="text-[11px] font-semibold text-white/35">{chartData.length} sessions</span> : null}
         </div>
+
+        {chartData.length > 0 ? (
+          <>
+            <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="h-[130px] w-full overflow-visible" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="progressArea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#22C55E" stopOpacity="0.28" />
+                  <stop offset="100%" stopColor="#22C55E" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              {areaPath ? <path d={areaPath} fill="url(#progressArea)" /> : null}
+              <path d={linePath} fill="none" stroke="#22C55E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              {chartData.map((d, i) => (
+                <circle
+                  key={i}
+                  cx={xForIndex(i)}
+                  cy={yForWeight(d.weight)}
+                  r={i === pointCount - 1 ? 4.5 : 3}
+                  fill={i === pointCount - 1 ? '#22C55E' : '#0a0e1a'}
+                  stroke="#22C55E"
+                  strokeWidth="2"
+                />
+              ))}
+            </svg>
+            <div className="mt-2 flex justify-between text-[10px] font-semibold text-white/35">
+              <span>{chartData[0].date}</span>
+              <span>{chartData[chartData.length - 1].date}</span>
+            </div>
+          </>
+        ) : (
+          <div className="flex h-[130px] items-center justify-center rounded-[12px] border border-dashed border-white/10 bg-white/[0.02] p-4">
+            <p className="text-center text-[13px] text-white/30">
+              Complete a session with {currentExerciseName} to see your history chart.
+            </p>
+          </div>
+        )}
       </Card>
     </div>
   );

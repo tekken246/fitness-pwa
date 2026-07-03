@@ -1,6 +1,6 @@
 'use server';
 
-import { and, eq, max } from 'drizzle-orm';
+import { and, eq, inArray, max } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 
 import { db } from '@/db/client';
@@ -64,6 +64,63 @@ export async function removeExerciseFromRoutineAction(formData: FormData) {
   await db
     .delete(templateExerciseAssignments)
     .where(and(eq(templateExerciseAssignments.id, assignmentId), eq(templateExerciseAssignments.dayId, dayId)));
+
+  revalidatePath(`/workouts/${dayId}/edit`);
+}
+
+export async function addExercisesToRoutineAction({
+  dayId,
+  exerciseIds,
+}: {
+  dayId: string;
+  exerciseIds: string[];
+}): Promise<void> {
+  const clerkUserId = await requireClerkUserId();
+  await enforceRateLimit(clerkUserId, 'routine-write');
+
+  if (!dayId) throw new Error('Missing routine id');
+
+  const uniqueIds = Array.from(new Set(exerciseIds)).filter(Boolean);
+  if (uniqueIds.length === 0) return;
+  if (uniqueIds.length > 50) throw new Error('Too many exercises selected at once (max 50).');
+
+  // Authorise: only the owner of this (non-seed) routine may modify it.
+  await assertEditableTemplateDay(dayId, clerkUserId);
+
+  // Validate every id against the shared catalogue; drop anything unknown.
+  const rows = await db
+    .select({ id: exercises.id, name: exercises.name })
+    .from(exercises)
+    .where(inArray(exercises.id, uniqueIds));
+  const nameById = new Map(rows.map((row) => [row.id, row.name]));
+
+  const [result] = await db
+    .select({ maxPosition: max(templateExerciseAssignments.position) })
+    .from(templateExerciseAssignments)
+    .where(eq(templateExerciseAssignments.dayId, dayId));
+
+  let nextPosition = (result?.maxPosition ?? -1) + 1;
+
+  // Preserve the order the athlete selected them in, and keep positions sequential
+  // so the (dayId, position) unique index never collides.
+  const values = uniqueIds
+    .filter((id) => nameById.has(id))
+    .map((id) => ({
+      id: `assign_${crypto.randomUUID()}`,
+      dayId,
+      exerciseId: id,
+      displayName: nameById.get(id) as string,
+      position: nextPosition++,
+      sets: 3,
+      targetReps: [10, 10, 10],
+      targetType: 'weight_reps',
+      isOptional: false,
+      perSide: false,
+    }));
+
+  if (values.length === 0) return;
+
+  await db.insert(templateExerciseAssignments).values(values);
 
   revalidatePath(`/workouts/${dayId}/edit`);
 }
